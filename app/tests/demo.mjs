@@ -12,15 +12,13 @@ const h = await page.evaluateHandle(async () => {
   const blob = c => new Promise(r => c.toBlob(r, 'image/jpeg', .92));
   const assets = [];
   for (const [n, c] of [['a', land], ['b', tile], ['c', weave]]) assets.push(await media.importFile(new File([await blob(c)], `${n}.jpg`, { type: 'image/jpeg' })));
-  const tpl = TEMPLATES.find(t => t.id === 'sv_raqam');
-  const p = applyTemplate(tpl, assets);
-  const m = await media.ensureUrlAsset('music:kuch', new URL('music/kuch.mp3', document.baseURI).href, 'Kuch', 'audio');
-  addMusic(p, m, 'Kuch');
+  const m = await media.ensureUrlAsset('music:ritm', new URL('music/ritm.mp3', document.baseURI).href, 'Ritm', 'audio');
+  const p = await window.__t.dance.danceMontage({ media: assets, music: m, aspect: '9:16', style: 'aralash', amount: 1, beatsPerCut: 2, length: 12, flash: true, viz: 'bars', title: "Musiqaga o'ynash" });
   const r = await exportProject(p, { height: 720, fps: 30, quality: 'high' }, () => {});
   window.__r = { w: r.width, h: r.height, dur: r.duration, size: r.size, secs: r.seconds };
   return r.file;
 });
 console.log(await page.evaluate(() => window.__r));
-await saveBlob(page, h, `${OUT}/namuna.mp4`);
+await saveBlob(page, h, `${OUT}/namuna-musiqa.mp4`);
 console.log(errors.slice(0, 5));
 await browser.close();

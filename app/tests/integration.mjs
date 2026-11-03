@@ -53,6 +53,7 @@ await admin.fill('#tpl-title', 'Hayit muborak');
 await admin.selectOption('#tpl-intro', 'coins');
 await admin.fill('#tpl-intro-text', 'HAYIT');
 await admin.selectOption('#tpl-music', 'bayram');
+await admin.selectOption('#tpl-dance', 'sakrash');
 await admin.click('.pick[data-id=f_gold]');
 await admin.click('.pick[data-id=t_cubeL]');
 await admin.screenshot({ path: `${OUT}/40-admin-template-form.png` });
@@ -99,7 +100,7 @@ await tid('tpl-empty').click();
 await page.waitForSelector('[data-testid=editor]', { timeout: 30000 });
 await page.waitForTimeout(2500);
 await page.screenshot({ path: `${OUT}/33-server-template-open.png` });
-log('clips from server template:', await tid('clip-main').count(), 'audio', await tid('clip-au').count());
+log('clips from server template:', await tid('clip-main').count(), 'audio', await tid('clip-au').count(), 'title', await page.title());
 
 // Hidden effect is gone from the picker.
 await tid('tool-filters').click();

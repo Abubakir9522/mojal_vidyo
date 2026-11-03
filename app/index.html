@@ -4,7 +4,20 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#11142a" />
+<style>html,body{margin:0;height:100%;background:#11142a}</style>
 <title>Vodiy Vidyo Edit</title>
 </head>
-<body><div id="app"></div><script type="module" src="/src/main.tsx"></script></body>
+<body><div id="app"></div>
+<script>
+// Shows a plain message if the app cannot start, usually because the phone's WebView is very old.
+(function () {
+  var err = '';
+  window.addEventListener('error', function (e) { err = err || (e.message || 'script'); });
+  window.addEventListener('unhandledrejection', function (e) { err = err || String(e.reason && e.reason.message || e.reason); });
+  setTimeout(function () {
+    var a = document.getElementById('app');
+    if (a && !a.firstChild) a.innerHTML = '<div style="padding:32px 20px;color:#f4efe2;background:#11142a;height:100%;font:16px/1.5 sans-serif"><h2 style="margin:0 0 10px">Ilova ishga tushmadi</h2><p>Play Market orqali <b>Android System WebView</b> va <b>Chrome</b> ilovalarini yangilab, qayta oching.</p><p style="color:#a6abcc;font-size:13px">' + String(err).replace(/[<>&]/g, '') + '</p></div>';
+  }, 9000);
+})();
+</script><script type="module" src="/src/main.tsx"></script></body>
 </html>

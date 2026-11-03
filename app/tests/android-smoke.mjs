@@ -1,19 +1,22 @@
 // Runs inside the emulator job. Talks to the real Android WebView and tests what a browser test cannot:
 // real video decoding and MP4 export on Android, the bundled AI model, the editor, and saving to the gallery.
 import { _android as android } from 'playwright';
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import fs from 'node:fs';
 
 const OUT = 'tests/android-out';
 fs.mkdirSync(OUT, { recursive: true });
-const sh = c => execSync(c, { encoding: 'utf8', maxBuffer: 1 << 26 });
+const pexec = promisify(exec);
+// Never blocks the event loop and never waits forever: the first run hung on a blocking adb call.
+const sh = async (c, timeout = 60000) => (await pexec(c, { encoding: 'utf8', maxBuffer: 1 << 26, timeout })).stdout;
 const APK = 'android/app/build/outputs/apk/debug/app-debug.apk';
 const PKG = 'uz.mojal.video';
 const report = {};
 let failed = false;
 const save = () => fs.writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 1));
 const check = (name, ok, detail) => { report[name] = { ok, detail }; if (!ok) failed = true; save(); console.log(ok ? 'OK  ' : 'FAIL', name, detail ?? ''); };
-const shot = n => { try { sh(`adb exec-out screencap -p > ${OUT}/${n}.png`); } catch { /* a missing picture must not end the run */ } };
+const shot = async n => { try { await sh(`adb exec-out screencap -p > ${OUT}/${n}.png`, 30000); } catch { /* a missing picture must not end the run */ } };
 
 /** Every step has its own time limit, so a hang is reported by name instead of stalling the job. */
 async function step(name, ms, fn) {
@@ -29,37 +32,56 @@ async function step(name, ms, fn) {
   } finally { clearTimeout(timer); }
 }
 
-const hardStop = setTimeout(() => { check('run finished in time', false); finish(); }, 38 * 60000);
-function finish() {
+const hardStop = setTimeout(() => { check('run finished in time', false); void finish(); }, 38 * 60000);
+async function finish() {
   clearTimeout(hardStop);
-  try { fs.writeFileSync(`${OUT}/logcat.txt`, sh('adb logcat -d -t 4000')); } catch { /* the emulator may already be gone */ }
+  save();
+  try { fs.writeFileSync(`${OUT}/logcat.txt`, await sh('adb logcat -d', 45000)); } catch (e) { console.log('logcat', String(e).slice(0, 200)); }
   try {
-    const fatal = sh('adb logcat -d -b crash').trim();
+    const fatal = (await sh('adb logcat -d -b crash', 20000)).trim();
     check('no app crashes', !fatal.includes(PKG), fatal.slice(0, 600));
   } catch { /* no crash buffer on this image */ }
+  try { fs.writeFileSync(`${OUT}/webview-version.txt`, await sh('adb shell dumpsys webviewupdate', 20000)); } catch { /* informational only */ }
   save();
   process.exit(failed ? 1 : 0);
 }
 
+process.on('unhandledRejection', e => console.log('unhandled', String(e).slice(0, 300)));
 const fixture = n => fs.readFileSync(`tests/fixtures/${n}`).toString('base64');
 
 try {
-  sh(`adb install -r ${APK}`);
-  sh('adb logcat -c');
-  sh(`adb shell am start -n ${PKG}/.MainActivity`);
+  await sh(`adb install -r ${APK}`, 180000);
+  await sh('adb logcat -c', 20000);
+  await sh(`adb shell am start -n ${PKG}/.MainActivity`, 30000);
   const [device] = await android.devices();
   const webview = await device.webView({ pkg: PKG }, { timeout: 120000 });
   const page = await webview.page();
   const errors = [];
-  page.on('pageerror', e => errors.push(e.message));
+  const con = [];
+  page.on('pageerror', e => { errors.push(e.message); con.push('pageerror: ' + e.message); });
+  page.on('console', m => con.push(`${m.type()}: ${m.text()}`.slice(0, 400)));
+  page.on('requestfailed', r => con.push(`failed: ${r.url().slice(0, 160)} ${r.failure()?.errorText}`));
+  const diag = async () => {
+    try {
+      const d = await page.evaluate(() => ({ href: location.href, title: document.title, ready: document.readyState, app: document.getElementById('app')?.innerHTML.slice(0, 300), hasHome: !!document.querySelector('.home'), ua: navigator.userAgent, w: innerWidth, h: innerHeight }));
+      fs.writeFileSync(`${OUT}/diag.json`, JSON.stringify({ url: page.url(), d, con }, null, 1));
+      console.log('DIAG', JSON.stringify(d));
+    } catch (e) { fs.writeFileSync(`${OUT}/diag.json`, JSON.stringify({ url: page.url(), err: String(e), con }, null, 1)); }
+    console.log(con.slice(0, 30).join('\n'));
+  };
 
   await step('app opens', 120000, async () => {
-    await page.waitForSelector('.home', { timeout: 110000 });
-    await page.waitForFunction(() => window.__t, null, { timeout: 60000 });
+    await new Promise(r => setTimeout(r, 12000));
+    await shot('0-after-start');
+    await diag();
+    await page.waitForSelector('.home', { timeout: 90000 });
+    await page.waitForFunction(() => window.__t, null, { timeout: 30000 });
     check('app opens', true);
   });
   await new Promise(r => setTimeout(r, 2000));
-  shot('1-home');
+  await shot('1-home');
+  await diag();
+  if (!report['app opens']?.ok) { check('stopped early', false, 'app did not open'); await finish(); }
   check('app name', (await page.textContent('.hero-text h1')) === 'Vodiy Vidyo Edit');
 
   const f = await step('device features', 60000, () => page.evaluate(async () => {
@@ -142,8 +164,8 @@ try {
         check('saved to gallery', /^content:/.test(saved.uri), saved.uri);
         await new Promise(r => setTimeout(r, 1500));
         try {
-          sh(`adb pull "/sdcard/Movies/Vodiy Vidyo Edit/smoke.mp4" ${OUT}/smoke.mp4`);
-          const probe = sh(`ffprobe -v error -show_entries stream=codec_name,width,height,duration -of csv=p=0 ${OUT}/smoke.mp4`).trim().replace(/\n/g, ' | ');
+          await sh(`adb pull "/sdcard/Movies/Vodiy Vidyo Edit/smoke.mp4" ${OUT}/smoke.mp4`);
+          const probe = (await sh(`ffprobe -v error -show_entries stream=codec_name,width,height,duration -of csv=p=0 ${OUT}/smoke.mp4`)).trim().replace(/\n/g, ' | ');
           check('saved video is valid', /h264/.test(probe) && /aac|opus/.test(probe) && fs.statSync(`${OUT}/smoke.mp4`).size === ex.size, probe);
         } catch (e) { check('saved video is valid', false, String(e).slice(0, 300)); }
       }
@@ -179,10 +201,10 @@ try {
       await page.click('[data-testid=project]');
       await page.waitForSelector('[data-testid=editor]', { timeout: 60000 });
       await new Promise(r => setTimeout(r, 6000));
-      shot('2-editor');
+      await shot('2-editor');
       await page.click('[data-testid=play]');
       await new Promise(r => setTimeout(r, 5000));
-      shot('3-playing');
+      await shot('3-playing');
       const t = await page.evaluate(() => ({ t: window.__player.t, playing: window.__player.playing, err: window.__player.lastError }));
       check('preview plays', t.t > 0.5 && !t.err, JSON.stringify(t));
       await page.evaluate(() => window.__player.pause());
@@ -191,8 +213,9 @@ try {
     });
   }
   check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
-  shot('4-end');
+  await shot('4-end');
+  await diag();
 } catch (e) {
   check('smoke run finished', false, String(e?.stack ?? e).slice(0, 800));
 }
-finish();
+await finish();
