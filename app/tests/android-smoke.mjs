@@ -153,16 +153,6 @@ try {
     }, { code: buildProject, ids }));
     if (ex) check('MP4 export in the WebView', ex.size > 5000 && ex.codec === 'avc', JSON.stringify(ex));
 
-    const big = await step('720p export', 300000, () => page.evaluate(async () => {
-      const T = window.__t, ty = T.ty;
-      const p = ty.newProject('9:16', 'katta');
-      p.main = [ty.newClip({ kind: 'color', color: '#d6246e', duration: 1, effects: [{ id: 'l_bokeh', amount: 1 }] })];
-      p.texts = [ty.newText({ text: '720p', start: 0, duration: 1 })];
-      const r = await T.exportProject(p, { height: 720, fps: 30, quality: 'high' }, () => {});
-      return { size: r.size, codec: r.codec, w: r.width, h: r.height, secs: +r.seconds.toFixed(1) };
-    }));
-    if (big) check('720p export', big.size > 1000 && big.w === 720 && big.codec === 'avc', JSON.stringify(big));
-
     if (ex) {
       const saved = await step('save to gallery', 120000, () => page.evaluate(async () => {
         const P = window.Capacitor.Plugins.MojalMedia;
@@ -186,6 +176,17 @@ try {
         } catch (e) { check('saved video is valid', false, String(e).slice(0, 300)); }
       }
     }
+
+    // Runs after saving, because each export clears the previous result file.
+    const big = await step('720p export', 300000, () => page.evaluate(async () => {
+      const T = window.__t, ty = T.ty;
+      const p = ty.newProject('9:16', 'katta');
+      p.main = [ty.newClip({ kind: 'color', color: '#d6246e', duration: 1, effects: [{ id: 'l_bokeh', amount: 1 }] })];
+      p.texts = [ty.newText({ text: '720p', start: 0, duration: 1 })];
+      const r = await T.exportProject(p, { height: 720, fps: 30, quality: 'high' }, () => {});
+      return { size: r.size, codec: r.codec, w: r.width, h: r.height, secs: +r.seconds.toFixed(1) };
+    }));
+    if (big) check('720p export', big.size > 1000 && big.w === 720 && big.codec === 'avc', JSON.stringify(big));
 
     const rev = await step('reverse clip', 300000, () => page.evaluate(async id => {
       const { tools, media } = window.__t;
