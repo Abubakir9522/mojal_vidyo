@@ -54,9 +54,13 @@ try {
   await sh(`adb install -r ${APK}`, 180000);
   await sh('adb logcat -c', 20000);
   await sh(`adb shell am start -n ${PKG}/.MainActivity`, 30000);
-  const [device] = await android.devices();
-  const webview = await device.webView({ pkg: PKG }, { timeout: 120000 });
-  const page = await webview.page();
+  const limit = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what}: ${ms / 1000} soniyada tugamadi`)), ms))]);
+  const [device] = await limit(android.devices(), 120000, 'adb devices');
+  console.log('device found');
+  const webview = await limit(device.webView({ pkg: PKG }, { timeout: 150000 }), 170000, 'webview');
+  console.log('webview found');
+  const page = await limit(webview.page(), 120000, 'page');
+  console.log('page attached', page.url());
   const errors = [];
   const con = [];
   page.on('pageerror', e => { errors.push(e.message); con.push('pageerror: ' + e.message); });
