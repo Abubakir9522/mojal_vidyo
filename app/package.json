@@ -1,0 +1,43 @@
+{
+  "name": "mojal-video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "android:sync": "vite build && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
+    "@expo-google-fonts/montserrat": "^0.4.2",
+    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/comfortaa": "^5.3.0",
+    "@fontsource/lobster": "^5.3.0",
+    "@fontsource/montserrat": "^5.3.0",
+    "@fontsource/oswald": "^5.3.0",
+    "@fontsource/pacifico": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@fontsource/roboto-condensed": "^5.3.0",
+    "@fontsource/russo-one": "^5.3.0",
+    "@mediabunny/aac-encoder": "^1.65.1",
+    "mediabunny": "^1.65.1",
+    "preact": "^10.29.8",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/three": "^0.187.0",
+    "opentype.js": "^2.0.0",
+    "playwright": "^1.63.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}

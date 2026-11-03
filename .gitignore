@@ -1,0 +1,7 @@
+node_modules/
+dist/
+server/data/
+app/tests/out/
+app/tests/android-out/
+*.log
+.DS_Store

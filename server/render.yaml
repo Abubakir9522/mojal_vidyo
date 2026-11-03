@@ -1,0 +1,13 @@
+# Test uchun. Render'ning bepul tarifida disk yo'q: server qayta ishga tushganda baza o'chadi.
+# Doimiy ishlatish uchun disk qo'shing (pullik) yoki VPS oling.
+services:
+  - type: web
+    name: mojal-video
+    runtime: docker
+    rootDir: server
+    plan: free
+    envVars:
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: TRUST_PROXY
+        value: "1"
