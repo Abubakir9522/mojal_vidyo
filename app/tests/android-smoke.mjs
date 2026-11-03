@@ -256,14 +256,16 @@ try {
       await shot(`5-chooser-${i}`);
       const xml = await sh('adb exec-out uiautomator dump /dev/tty', 30000).catch(() => '');
       if (i === 0) fs.writeFileSync(`${OUT}/chooser.xml`, xml);
-      const m = /text="sinov_klip[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
+      // Android 13 and newer open the system photo picker, where a video is labelled by its length.
+      const m = /text="(?:sinov_klip[^"]*|00:06)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
       if (m) {
         await sh(`adb shell input tap ${(+m[1] + +m[3]) >> 1} ${(+m[2] + +m[4]) >> 1}`, 15000);
         tapped = true;
-      } else if (i === 3) {
-        // The chooser may open on Recent: its root list leads to Downloads.
-        const d = /(?:text|content-desc)="(?:Downloads|Show roots)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
-        if (d) await sh(`adb shell input tap ${(+d[1] + +d[3]) >> 1} ${(+d[2] + +d[4]) >> 1}`, 15000);
+        await new Promise(r => setTimeout(r, 2500));
+        await shot('5-selected');
+        const after = await sh('adb exec-out uiautomator dump /dev/tty', 30000).catch(() => '');
+        const add = /text="(?:Add|Select|Done|OK)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(after);
+        if (add) await sh(`adb shell input tap ${(+add[1] + +add[3]) >> 1} ${(+add[2] + +add[4]) >> 1}`, 15000);
       }
     }
     check('Android file chooser shows the video', tapped);
