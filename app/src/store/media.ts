@@ -167,7 +167,7 @@ export async function getImage(id: string): Promise<ImageBitmap | null> {
   const asset = await getAsset(id);
   if (!asset) return null;
   const blob = await getBlob(asset);
-  const opts: ImageBitmapOptions = { imageOrientation: 'from-image' };
+  const opts: ImageBitmapOptions = { imageOrientation: 'from-image', premultiplyAlpha: 'none' };
   const k = Math.min(1, IMG_MAX / Math.max(asset.width || 1, asset.height || 1));
   if (k < 1) { opts.resizeWidth = Math.round(asset.width * k); opts.resizeHeight = Math.round(asset.height * k); opts.resizeQuality = 'high'; }
   const bmp = await createImageBitmap(blob, opts);

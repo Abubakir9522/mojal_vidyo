@@ -39,7 +39,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .hero { position: relative; height: 190px; overflow: hidden; background: var(--ink); }
 .atlas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .hero-text { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 16px 14px; background: linear-gradient(to top, var(--ink) 18%, rgba(17,20,42,.82) 52%, rgba(17,20,42,0)); }
-.hero-text h1 { font: 400 38px/1 var(--display); letter-spacing: .005em; }
+.hero-text h1 { font: 400 34px/1 var(--display); letter-spacing: .005em; }
 .hero-text p { color: var(--text); margin-top: 6px; }
 .notice { margin: 10px 16px 0; padding: 10px 12px; background: var(--panel); border-left: 4px solid var(--rishton); border-radius: 4px 10px 10px 4px; display: grid; gap: 2px; }
 .notice span { color: var(--mute); font-size: 14px; }
@@ -226,3 +226,12 @@ input[type=color] { width: 44px; height: 38px; border: 0; padding: 0; background
 .busy > div { width: min(320px, 100%); display: grid; gap: 12px; text-align: center; }
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(76px + var(--safe-b)); background: var(--text); color: var(--ink); padding: 11px 14px; border-radius: 10px; z-index: 50; font-weight: 700; text-align: center; }
 .toast.bad { background: #ffd9dd; color: #5a0010; }
+
+.kf-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.kf-row .hint { flex-basis: 100%; }
+.sub-list { display: grid; gap: 4px; }
+.sub-row { display: grid; grid-template-columns: 52px 1fr; gap: 6px; align-items: center; }
+.sub-row button { min-height: 40px; background: var(--panel2); border-radius: 8px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.sub-row input { min-height: 40px; width: 100%; padding: 6px 10px; background: var(--deep); border: 1px solid var(--line); border-radius: 8px; }
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.preset { min-height: 62px; border-radius: 10px; background: #2c3160; display: flex; align-items: center; justify-content: center; padding: 6px; font-size: 19px; overflow: hidden; }

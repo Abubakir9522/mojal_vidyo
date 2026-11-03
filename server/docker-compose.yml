@@ -1,5 +1,5 @@
 services:
-  mojal:
+  vodiy:
     build: .
     restart: unless-stopped
     ports: ["8080:8080"]
@@ -7,6 +7,6 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Admin parolini .env fayliga yozing}
       TRUST_PROXY: "1"
     volumes:
-      - mojal-data:/data
+      - vodiy-data:/data
 volumes:
-  mojal-data:
+  vodiy-data:

@@ -46,6 +46,12 @@ export interface SceneParams {
   mediaIds?: string[];
 }
 
+export interface Keyframe { t: number; x: number; y: number; scale: number; rotation: number; opacity: number }
+export interface Dance { style: string; amount: number; flash: boolean; fxOnBeat: boolean }
+export interface Mask { shape: string; size: number; feather: number }
+export interface Crop { l: number; t: number; r: number; b: number }
+export type VoiceFx = 'none' | 'ingichka' | 'yogon' | 'robot' | 'aks' | 'zal';
+
 export interface Clip {
   id: string;
   kind: ClipKind;
@@ -66,6 +72,19 @@ export interface Clip {
   motion: string;
   /** Transition played from this clip into the next one. */
   transition: { id: string; duration: number } | null;
+  /** Movement that follows the music's beats. */
+  dance?: Dance;
+  /** Hand-set positions over the clip's own time, overriding the transform. */
+  keyframes?: Keyframe[];
+  /** Named speed curve. Clips on a curve play without their own sound. */
+  ramp?: string;
+  mask?: Mask;
+  crop?: Crop;
+  /** Fills the empty space around a fitted picture with a blurred copy. */
+  canvas?: 'none' | 'blur';
+  keepPitch?: boolean;
+  denoise?: boolean;
+  voice?: VoiceFx;
 }
 
 export interface OverlayClip extends Clip { start: number; blend: 'normal' | 'screen' | 'multiply' | 'add' }
@@ -84,6 +103,10 @@ export interface TextClip {
   align: 'left' | 'center' | 'right';
   x: number; y: number; rotation: number; scale: number; letterSpacing: number;
   animIn: TextAnim; animOut: TextAnim; loop: TextLoop;
+  /** Draws a music visualizer instead of the text. */
+  viz?: 'bars' | 'mirror' | 'circle' | 'line' | 'dots';
+  keyframes?: Keyframe[];
+  subtitle?: boolean;
 }
 
 export interface AudioClip {
@@ -93,6 +116,8 @@ export interface AudioClip {
   /** Beat positions, in seconds of the source, shown as marks on the timeline. */
   beats?: number[];
   kind: 'music' | 'sfx' | 'voice';
+  denoise?: boolean;
+  voice?: VoiceFx;
 }
 
 export interface Project {

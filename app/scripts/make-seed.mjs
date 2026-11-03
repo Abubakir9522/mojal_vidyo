@@ -6,7 +6,7 @@ const p = await b.newPage();
 await p.goto(process.env.BASE ?? 'http://127.0.0.1:5199/');
 await p.waitForFunction(() => window.__t);
 const seed = await p.evaluate(async () => {
-  const { EFFECTS, TRANSITIONS, SCENES, MOTIONS } = window.__t;
+  const { EFFECTS, TRANSITIONS, SCENES, MOTIONS, DANCES } = window.__t;
   const t = await import('/src/data/templates.ts');
   return {
     templates: t.TEMPLATES.map(x => ({ id: x.id, name: x.name, cat: x.cat, aspect: x.aspect, featured: !!x.featured })),
@@ -15,6 +15,7 @@ const seed = await p.evaluate(async () => {
     transitions: TRANSITIONS.map(x => ({ id: x.id, name: x.name, cat: x.cat })),
     scenes: SCENES.map(x => ({ id: x.id, name: x.name })),
     motions: MOTIONS.map(x => ({ id: x.id, name: x.name })),
+    dances: DANCES.map(x => ({ id: x.id, name: x.name })),
     music: t.MUSIC_TRACKS.map(x => ({ id: x.id, name: x.name, mood: x.mood })),
   };
 });

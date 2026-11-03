@@ -2,7 +2,7 @@
 # Doimiy ishlatish uchun disk qo'shing (pullik) yoki VPS oling.
 services:
   - type: web
-    name: mojal-video
+    name: vodiy-vidyo-edit
     runtime: docker
     rootDir: server
     plan: free

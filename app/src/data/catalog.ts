@@ -3,7 +3,7 @@ import { TEMPLATES, Template, CATEGORIES } from './templates';
 import { EFFECTS, EffectDef, FxCat } from '../engine/effects';
 import { TRANSITIONS, TransitionDef } from '../engine/transitions';
 import { SCENES, SceneDef } from '../engine/scene3d';
-import { MOTIONS } from '../engine/motion';
+import { DANCES, MOTIONS } from '../engine/motion';
 
 const base = () => document.baseURI;
 export const thumbUrl = (kind: 'fx' | 'tr' | 'scene' | 'tpl', id: string) => new URL(`thumbs/${kind}/${id}.webp`, base()).href;
@@ -30,4 +30,4 @@ export const allTransitions = (): TransitionDef[] => { const h = new Set(api.cat
 export const allScenes = (): SceneDef[] => { const h = new Set(api.catalog.hidden.scenes); return SCENES.filter(e => !h.has(e.id)); };
 
 /** Totals for the screens and the admin panel. Counted from the real lists, never typed by hand. */
-export const COUNTS = { templates: TEMPLATES.length, effects: EFFECTS.length, transitions: TRANSITIONS.length, scenes: SCENES.length, motions: MOTIONS.length - 1, categories: CATEGORIES.length };
+export const COUNTS = { templates: TEMPLATES.length, effects: EFFECTS.length, transitions: TRANSITIONS.length, scenes: SCENES.length, motions: MOTIONS.length - 1, dances: DANCES.length, categories: CATEGORIES.length };

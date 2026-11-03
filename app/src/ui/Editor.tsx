@@ -3,10 +3,16 @@ import type { Nav } from './App';
 import { Icon } from './icons';
 import { mmss, useUi } from './kit';
 import { Player } from '../engine/player';
-import { AudioClip, Clip, MediaAsset, OverlayClip, Project, TextClip, uid } from '../engine/types';
-import { clipDuration, layoutMain, normalize, projectDuration, splitAudioAt, splitMainAt, splitOverlayAt, splitTextAt } from '../engine/timeline';
+import { AudioClip, Clip, MediaAsset, OverlayClip, Project, TextClip, newClip, newText, uid } from '../engine/types';
+import { clipDuration, layoutMain, normalize, projectDuration, sourceTime, splitAudioAt, splitMainAt, splitOverlayAt, splitTextAt } from '../engine/timeline';
 import { Timeline } from './Timeline';
 import { Sheets, SheetName } from './Sheets';
+import { importAll } from './kit';
+import { pickFiles } from './native';
+import { grabFrame, reverseVideo } from '../auto/tools';
+import { cutoutPerson } from '../auto/cutout';
+import { kv } from '../store/db';
+import type { Brand } from './AdScreen';
 import { ExportSheet } from './ExportSheet';
 import { saveProject } from '../store/projects';
 import { getAsset } from '../store/media';
@@ -204,6 +210,93 @@ export function Editor({ initial, nav, backRef }: { initial: Project; nav: Nav; 
     });
   };
 
+  const replaceOnTimeline = (id: string, a: MediaAsset, fn?: (c: Clip) => void) => {
+    commit(p => {
+      const c = p.main.find(x => x.id === id) ?? p.overlays.find(x => x.id === id);
+      if (!c) return;
+      const len = clipDuration(c);
+      c.mediaId = a.id;
+      if (a.kind === 'video') { c.kind = 'video'; c.in = 0; c.out = Math.min(a.duration, len * c.speed); }
+      else { c.kind = 'image'; c.duration = len; }
+      fn?.(c);
+    });
+  };
+
+  const currentClipAsset = () => {
+    const c = sel?.type === 'main' ? projRef.current.main.find(x => x.id === sel.id) : sel?.type === 'overlay' ? projRef.current.overlays.find(x => x.id === sel.id) : undefined;
+    return { c, a: c?.mediaId ? assets.current.get(c.mediaId) : undefined };
+  };
+
+  const reverseSel = async () => {
+    const { c, a } = currentClipAsset();
+    if (!c || !a) return;
+    try {
+      const out = await reverseVideo(a, c.in, c.out, (p, msg) => ui.busy(`Teskari qilinmoqda: ${msg}`, p));
+      await ensureAssets([out.id]);
+      commit(p => {
+        const x = p.main.find(q => q.id === c.id) ?? p.overlays.find(q => q.id === c.id);
+        if (x) { x.mediaId = out.id; x.in = 0; x.out = out.duration; }
+      });
+      ui.toast('Klip teskari qilindi');
+    } catch (e) { ui.toast((e as Error).message, true); } finally { ui.done(); }
+  };
+
+  const freezeSel = async () => {
+    const { c, a } = currentClipAsset();
+    if (!c || !a || sel?.type !== 'main') return;
+    const pl = layoutMain(projRef.current).find(l => l.clip.id === c.id);
+    if (!pl) return;
+    const t = Math.max(pl.start + 0.01, Math.min(pl.end - 0.01, playerRef.current?.t ?? pl.start));
+    try {
+      ui.busy('Kadr olinmoqda');
+      const shot = await grabFrame(a, sourceTime(c, t - pl.start));
+      await ensureAssets([shot.id]);
+      commit(p => {
+        splitMainAt(p, t);
+        const at = layoutMain(p).find(l => t >= l.start + 0.001 && t < l.end);
+        const idx = at ? at.index : p.main.findIndex(x => x.id === c.id);
+        const insertAt = Math.abs((at?.start ?? 0) - t) < 0.06 ? idx : idx + 1;
+        p.main.splice(insertAt, 0, newClip({ kind: 'image', mediaId: shot.id, duration: 2 }));
+      });
+      ui.toast("Kadr to'xtatildi");
+    } catch (e) { ui.toast((e as Error).message, true); } finally { ui.done(); }
+  };
+
+  const cutoutSel = async () => {
+    const { c, a } = currentClipAsset();
+    if (!c || !a) return;
+    try {
+      ui.busy('Fon olib tashlanmoqda');
+      const out = await cutoutPerson(a);
+      await ensureAssets([out.id]);
+      replaceOnTimeline(c.id, out);
+      ui.toast('Fon olib tashlandi');
+    } catch (e) { ui.toast((e as Error).message, true); } finally { ui.done(); }
+  };
+
+  const replaceSel = async () => {
+    const { c } = currentClipAsset();
+    if (!c) return;
+    const [a] = await importAll(await pickFiles('video/*,image/*', false), ui);
+    if (!a || a.kind === 'audio') return;
+    await ensureAssets([a.id]);
+    replaceOnTimeline(c.id, a);
+  };
+
+  /** Puts the saved logo and contact details over the whole video. */
+  const addBrand = async () => {
+    const b = await kv.get<Brand>('brand');
+    if (!b || (!b.name && !b.phone && !b.logoId)) { ui.toast("Avval Reklama ustasida do'kon ma'lumotini kiriting"); return; }
+    if (b.logoId) await ensureAssets([b.logoId]);
+    commit(p => {
+      const total = Math.max(1, projectDuration(p));
+      if (b.logoId) { const l = newClip({ kind: 'image', mediaId: b.logoId, duration: total }); p.overlays.push({ ...l, start: 0, blend: 'normal', transform: { ...l.transform, fit: 'contain', scale: 0.17, x: 0.34, y: 0.42 } }); }
+      const line = [b.name, b.phone].filter(Boolean).join('  ');
+      if (line) p.texts.push(newText({ text: line, start: 0, duration: total, size: 2.8, y: 0.95, bg: '#0a0c1caa', animIn: 'fade', animOut: 'none' }));
+    });
+    ui.toast('Brend qo\'shildi');
+  };
+
   const selectedMain = sel?.type === 'main' ? project.main.find(c => c.id === sel.id) : undefined;
   const selectedOverlay = sel?.type === 'overlay' ? project.overlays.find(c => c.id === sel.id) : undefined;
   const selectedAudio = sel?.type === 'audio' ? project.audio.find(c => c.id === sel.id) : undefined;
@@ -213,24 +306,27 @@ export function Editor({ initial, nav, backRef }: { initial: Project; nav: Nav; 
   const clipTools = (): Tool[] => {
     const c = selClip!;
     const t: Tool[] = [['split', "Bo'lish", splitHere, 'split']];
-    if (c.kind === 'video') t.push(['speed', 'Tezlik', () => api.open('speed'), 'speed'], ['volume', 'Ovoz', () => api.open('volume'), 'volume']);
+    if (c.kind === 'video') t.push(['speed', 'Tezlik', () => api.open('speed'), 'speed'], ['volume', 'Ovoz', () => api.open('volume'), 'volume'], ['undo', 'Teskari', () => void reverseSel(), 'reverse'], ['pause', "To'xtatish", () => void freezeSel(), 'freeze']);
     if (c.kind === 'scene3d') t.push(['cube', '3D sahna', () => api.open('scene'), 'scene']);
     if (c.kind === 'image' || c.kind === 'color' || c.kind === 'scene3d') t.push(['speed', 'Davomiylik', () => api.open('duration'), 'duration']);
-    t.push(['fx', 'Effekt', () => api.open('effects'), 'effects'], ['filter', 'Filtr', () => api.open('filters'), 'filters']);
-    if (c.kind !== 'scene3d' && c.kind !== 'color') t.push(['sliders', 'Sozlash', () => api.open('adjust'), 'adjust'], ['motion', 'Harakat', () => api.open('motion'), 'motion'], ['frame', 'Kadr', () => api.open('transform'), 'transform']);
+    t.push(['beat', "O'ynatish", () => api.open('dance'), 'dance'], ['fx', 'Effekt', () => api.open('effects'), 'effects'], ['filter', 'Filtr', () => api.open('filters'), 'filters']);
+    if (c.kind === 'image') t.push(['user', 'Fonsiz', () => void cutoutSel(), 'cutout']);
+    if (c.kind !== 'scene3d' && c.kind !== 'color') t.push(['sliders', 'Sozlash', () => api.open('adjust'), 'adjust'], ['motion', 'Harakat', () => api.open('motion'), 'motion'], ['frame', 'Kadr', () => api.open('transform'), 'transform'], ['scissors', 'Qirqish', () => api.open('crop'), 'crop'], ['grid', 'Niqob', () => api.open('mask'), 'mask'], ['swap', 'Almashtirish', () => void replaceSel(), 'replace']);
     if (selectedOverlay) t.push(['layers', 'Aralashtirish', () => api.open('blend'), 'blend']);
     if (selectedMain) t.push(['left', 'Chapga', () => moveMain(-1), 'moveL'], ['right', "O'ngga", () => moveMain(1), 'moveR']);
     t.push(['copy', 'Nusxa', duplicateSel, 'dup'], ['trash', "O'chirish", removeSel, 'del']);
     return t;
   };
-  const textTools = (): Tool[] => [['text', 'Tahrirlash', () => api.open('text'), 'textedit'], ['split', "Bo'lish", splitHere, 'split'], ['copy', 'Nusxa', duplicateSel, 'dup'], ['trash', "O'chirish", removeSel, 'del']];
-  const audioTools = (): Tool[] => [['volume', 'Ovoz', () => api.open('audioedit'), 'audioedit'], ['beat', 'Ritm', () => api.open('beat'), 'beat'], ['split', "Bo'lish", splitHere, 'split'], ['copy', 'Nusxa', duplicateSel, 'dup'], ['trash', "O'chirish", removeSel, 'del']];
+  const textTools = (): Tool[] => [['text', 'Tahrirlash', () => api.open('text'), 'textedit'], ['motion', 'Kalit kadr', () => api.open('textkf'), 'textkf'], ['split', "Bo'lish", splitHere, 'split'], ['copy', 'Nusxa', duplicateSel, 'dup'], ['trash', "O'chirish", removeSel, 'del']];
+  const audioTools = (): Tool[] => [['volume', 'Ovoz', () => api.open('audioedit'), 'audioedit'], ['beat', 'Ritm', () => api.open('beat'), 'beat'], ['wave', 'Ekvalayzer', () => api.open('viz'), 'viz'], ['split', "Bo'lish", splitHere, 'split'], ['copy', 'Nusxa', duplicateSel, 'dup'], ['trash', "O'chirish", removeSel, 'del']];
   const rootTools = (): Tool[] => [
-    ['scissors', 'Kesish', splitHere, 'split'], ['plus', "Qo'shish", () => api.open('add'), 'add'], ['music', 'Ovoz', () => api.open('audio'), 'audio'], ['text', 'Matn', () => api.open('textnew'), 'textnew'],
+    ['scissors', 'Kesish', splitHere, 'split'], ['plus', "Qo'shish", () => api.open('add'), 'add'], ['music', 'Ovoz', () => api.open('audio'), 'audio'], ['text', 'Matn', () => api.open('textnew'), 'textnew'], ['beat', "O'ynatish", () => api.open('dance'), 'dance'], ['wave', 'Subtitr', () => api.open('subtitle'), 'subtitle'],
     ['fx', 'Effekt', () => api.open('effects'), 'effects'], ['filter', 'Filtr', () => api.open('filters'), 'filters'], ['cube', '3D', () => api.open('scene3d'), 'scene3d'], ['layers', 'Qatlam', () => api.open('overlay'), 'overlay'],
-    ['sticker', 'Stiker', () => api.open('sticker'), 'sticker'], ['wand', 'Avto', () => api.open('auto'), 'auto'], ['frame', 'Format', () => api.open('format'), 'format'],
+    ['sticker', 'Stiker', () => api.open('sticker'), 'sticker'], ['wave', 'Ekvalayzer', () => api.open('viz'), 'viz'], ['bolt', 'Brend', () => void addBrand(), 'brand'], ['wand', 'Avto', () => api.open('auto'), 'auto'], ['frame', 'Format', () => api.open('format'), 'format'],
   ];
-  const tools = selClip ? clipTools() : sel?.type === 'text' ? textTools() : selectedAudio ? audioTools() : rootTools();
+  const selectedText = sel?.type === 'text' ? project.texts.find(t => t.id === sel.id) : undefined;
+  const vizTools = (): Tool[] => [['wave', 'Ekvalayzer', () => api.open('viz'), 'viz'], ['split', "Bo'lish", splitHere, 'split'], ['trash', "O'chirish", removeSel, 'del']];
+  const tools = selClip ? clipTools() : selectedText?.viz ? vizTools() : sel?.type === 'text' ? textTools() : selectedAudio ? audioTools() : rootTools();
 
   // Text and overlays can be dragged directly on the picture.
   const onStagePointer = (e: PointerEvent) => {

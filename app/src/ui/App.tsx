@@ -5,6 +5,8 @@ import { Home } from './Home';
 import { Templates } from './Templates';
 import { AutoScreen } from './AutoScreen';
 import { PhotoScreen } from './PhotoScreen';
+import { DanceScreen } from './DanceScreen';
+import { AdScreen } from './AdScreen';
 import { Account } from './Account';
 import { Editor } from './Editor';
 import { initApi, onApiChange } from '../store/api';
@@ -13,7 +15,7 @@ import type { Project } from '../engine/types';
 import { Icon } from './icons';
 import { isNative } from './native';
 
-export type Route = { name: 'home' } | { name: 'templates'; cat?: string } | { name: 'auto' } | { name: 'photo' } | { name: 'account' } | { name: 'editor'; id: string };
+export type Route = { name: 'home' } | { name: 'templates'; cat?: string } | { name: 'auto' } | { name: 'photo' } | { name: 'dance' } | { name: 'ad' } | { name: 'account' } | { name: 'editor'; id: string };
 export type Nav = (r: Route) => void;
 
 function Shell() {
@@ -50,6 +52,8 @@ function Shell() {
         {route.name === 'templates' && <Templates nav={nav} open={openProject} cat={route.cat} />}
         {route.name === 'auto' && <AutoScreen nav={nav} open={openProject} />}
         {route.name === 'photo' && <PhotoScreen nav={nav} open={openProject} />}
+        {route.name === 'dance' && <DanceScreen nav={nav} open={openProject} />}
+        {route.name === 'ad' && <AdScreen nav={nav} open={openProject} />}
         {route.name === 'account' && <Account nav={nav} open={openProject} />}
       </main>
       <nav class="tabbar" aria-label="Asosiy bo'limlar">

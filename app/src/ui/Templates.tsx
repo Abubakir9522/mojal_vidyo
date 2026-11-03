@@ -5,7 +5,8 @@ import { Icon } from './icons';
 import { pickFiles } from './native';
 import { allTemplates, templateThumb } from '../data/catalog';
 import { CATEGORIES, MUSIC_TRACKS, Template, addMusic, applyTemplate } from '../data/templates';
-import { ensureUrlAsset } from '../store/media';
+import { ensureUrlAsset, getAsset } from '../store/media';
+import { beatsForProject } from '../auto/dance';
 import type { Project } from '../engine/types';
 import { track } from '../store/api';
 
@@ -31,6 +32,13 @@ export function Templates({ open, cat }: { nav: Nav; open: (p: Project) => void;
       const assets = await importAll(files, ui);
       const p = applyTemplate(tpl, assets);
       if (tpl.music) { const m = await builtinMusicAsset(tpl.music); if (m) addMusic(p, m, MUSIC_TRACKS.find(x => x.id === tpl.music)!.name); }
+      if (tpl.dance) {
+        ui.busy("Qo'shiq ritmi aniqlanmoqda");
+        const known = new Map(assets.map(a => [a.id, a] as const));
+        for (const a of p.audio) { const x = await getAsset(a.mediaId); if (x) known.set(x.id, x); }
+        await beatsForProject(p, id => known.get(id), tpl.dance.step);
+        ui.done();
+      }
       void track('template_use', { id: tpl.id });
       await open(p);
     } catch (e) { ui.done(); ui.toast((e as Error).message, true); }
@@ -43,7 +51,7 @@ export function Templates({ open, cat }: { nav: Nav; open: (p: Project) => void;
       <Chips items={cats} value={active} onChange={setActive} label="Shablon turlari" />
       {list.length === 0 && <p class="empty">Bu nomda shablon topilmadi. Boshqa so'z bilan qidiring.</p>}
       <div class="tpl-grid" data-testid="tpl-grid">
-        {list.map(t => <Tile key={t.id} tall id={`tpl-${t.id}`} img={templateThumb(t)} name={t.name} badge={t.remote ? 'Yangi' : t.intro ? '3D' : t.aspect !== '9:16' ? t.aspect : undefined} color="#262b52" onClick={() => setPicked(t)} />)}
+        {list.map(t => <Tile key={t.id} tall id={`tpl-${t.id}`} img={templateThumb(t)} name={t.name} badge={t.remote ? 'Yangi' : t.dance ? 'Ritm' : t.intro ? '3D' : t.aspect !== '9:16' ? t.aspect : undefined} color="#262b52" onClick={() => setPicked(t)} />)}
       </div>
       {picked && (
         <div class="modal" role="dialog" aria-label={picked.name} data-testid="tpl-modal" onClick={e => { if (e.target === e.currentTarget) setPicked(null); }}>

@@ -56,6 +56,16 @@ function Strip({ asset, clipIn, clipOut, width, px }: { asset?: MediaAsset; clip
   );
 }
 
+/** Puts overlapping clips on separate rows, so every clip stays visible and can be tapped. */
+function lanes<T>(items: T[], start: (x: T) => number, end: (x: T) => number): T[][] {
+  const rows: { end: number; items: T[] }[] = [];
+  for (const it of [...items].sort((a, b) => start(a) - start(b))) {
+    const row = rows.find(r => r.end <= start(it) + 0.001);
+    if (row) { row.items.push(it); row.end = end(it); } else rows.push({ end: end(it), items: [it] });
+  }
+  return rows.map(r => r.items);
+}
+
 export function Timeline({ api, scrollRef, playing }: { api: EditorApi; scrollRef: MutableRef<(t: number, force?: boolean) => void>; playing: boolean }) {
   const { project, sel, setSel, commit, assets } = api;
   const [px, setPx] = useState(60);
@@ -192,7 +202,7 @@ export function Timeline({ api, scrollRef, playing }: { api: EditorApi; scrollRe
               const a = c.mediaId ? assets.get(c.mediaId) : undefined;
               const label = c.kind === 'scene3d' ? `3D: ${SCENE_BY_ID.get(c.scene ?? '')?.name ?? ''}` : c.kind === 'color' ? '' : '';
               return (
-                <div key={c.id} class={on ? 'tclip main on' : 'tclip main'} data-testid="clip-main" style={{ left: pl.start * px, width: w, background: c.kind === 'color' ? c.color : c.kind === 'scene3d' ? '#2b2470' : undefined }} onClick={e => { e.stopPropagation(); setSel({ type: 'main', id: c.id }); }}>
+                <div key={c.id} class={on ? 'tclip main on' : 'tclip main'} data-testid="clip-main" style={{ left: pl.start * px, width: w, background: c.kind === 'color' ? c.color : c.kind === 'scene3d' ? '#2b2470' : undefined }} onClick={e => { e.stopPropagation(); setSel({ type: 'main', id: c.id }); const now = api.time(); if (now < pl.start || now >= pl.end) api.seek(pl.start + Math.min(0.05, (pl.end - pl.start) / 2)); }}>
                   {(c.kind === 'video' || c.kind === 'image') && <Strip asset={a} clipIn={c.in} clipOut={c.kind === 'video' ? c.out : 0} width={w} px={px} />}
                   {label && <b class="clabel">{label}</b>}
                   <span class="cdur">{(pl.end - pl.start).toFixed(1)}s{c.speed !== 1 ? ` ${c.speed}x` : ''}{c.muted ? ' ovozsiz' : ''}{c.effects.length ? ` ${c.effects.length} fx` : ''}</span>
@@ -200,14 +210,14 @@ export function Timeline({ api, scrollRef, playing }: { api: EditorApi; scrollRe
                 </div>
               );
             })}
-            {layout.slice(0, -1).map(pl => (
+            {layout.slice(0, -1).filter(pl => pl.clip.transition || (pl.end - pl.start) * px >= 46).map(pl => (
               <button key={`tr${pl.clip.id}`} class={pl.clip.transition ? 'trbtn on' : 'trbtn'} data-testid="tr-btn" aria-label="O'tish qo'shish" style={{ left: (pl.end - pl.trOut / 2) * px - 13 }} onClick={e => { e.stopPropagation(); setSel({ type: 'main', id: pl.clip.id }); api.open('transition'); }}><Icon n={pl.clip.transition ? 'swap' : 'plus'} s={14} /></button>
             ))}
           </div>
 
-          {project.overlays.length > 0 && (
-            <div class="tl-track" style={{ width }}>
-              {project.overlays.map(o => {
+          {lanes(project.overlays, o => o.start, o => o.start + clipDuration(o)).map((row, ri) => (
+            <div class="tl-track" style={{ width }} key={`ov${ri}`}>
+              {row.map(o => {
                 const on = sel?.type === 'overlay' && sel.id === o.id;
                 const a = o.mediaId ? assets.get(o.mediaId) : undefined;
                 return (
@@ -217,11 +227,11 @@ export function Timeline({ api, scrollRef, playing }: { api: EditorApi; scrollRe
                 );
               })}
             </div>
-          )}
+          ))}
 
-          {project.texts.length > 0 && (
-            <div class="tl-track" style={{ width }}>
-              {project.texts.map(t => {
+          {lanes(project.texts, t => t.start, t => t.start + t.duration).map((row, ri) => (
+            <div class="tl-track" style={{ width }} key={`tx${ri}`}>
+              {row.map(t => {
                 const on = sel?.type === 'text' && sel.id === t.id;
                 return (
                   <div key={t.id} class={on ? 'tclip tx on' : 'tclip tx'} data-testid="clip-tx" style={{ left: t.start * px, width: t.duration * px }} onClick={e => { e.stopPropagation(); setSel({ type: 'text', id: t.id }); }} onPointerDown={on ? moveStart('text', t.id, t.start) as never : undefined}>
@@ -231,11 +241,11 @@ export function Timeline({ api, scrollRef, playing }: { api: EditorApi; scrollRe
                 );
               })}
             </div>
-          )}
+          ))}
 
-          {project.audio.length > 0 && (
-            <div class="tl-track" style={{ width }}>
-              {project.audio.map(a => {
+          {lanes(project.audio, a => a.start, a => a.start + totalAudioWidth(a)).map((row, ri) => (
+            <div class="tl-track" style={{ width }} key={`au${ri}`}>
+              {row.map(a => {
                 const on = sel?.type === 'audio' && sel.id === a.id;
                 const w = totalAudioWidth(a) * px;
                 const asset = assets.get(a.mediaId);
@@ -249,7 +259,7 @@ export function Timeline({ api, scrollRef, playing }: { api: EditorApi; scrollRe
                 );
               })}
             </div>
-          )}
+          ))}
         </div>
       </div>
       <div class="zoom" role="group" aria-label="Vaqt chizig'i masshtabi">

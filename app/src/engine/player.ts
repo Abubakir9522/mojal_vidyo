@@ -1,6 +1,7 @@
 import { Compositor, Frame } from './compositor';
 import { Scene3DRenderer } from './scene3d';
-import { activeMain, activeOverlays, clipDuration, envelope, layoutMain, projectDuration, sourceTime } from './timeline';
+import { activeMain, activeOverlays, clipDuration, envelope, hasRamp, layoutMain, projectDuration, sourceRate, sourceTime } from './timeline';
+import { loadSpectrum } from '../auto/spectrum';
 import { ASPECTS, AudioClip, Clip, MediaAsset, Project } from './types';
 import { getAsset, getBlob, getImage } from '../store/media';
 
@@ -37,6 +38,7 @@ export class Player {
     this.project = project;
     this.applySize();
     this.ensureFonts();
+    this.ensureSpectrum();
     this.loop = this.loop.bind(this);
     this.raf = requestAnimationFrame(this.loop);
   }
@@ -52,11 +54,19 @@ export class Player {
     this.project = p;
     this.applySize();
     this.ensureFonts();
+    this.ensureSpectrum();
     const ids = new Set([...p.main, ...p.overlays].map(c => c.id));
     for (const [id, e] of this.videos) if (!ids.has(id)) this.dropVideo(id, e);
     const aIds = new Set(p.audio.map(a => a.id));
     for (const [id, e] of this.audios) if (!aIds.has(id)) this.dropAudio(id, e);
     this.dirty = true;
+  }
+
+  private ensureSpectrum() {
+    if (!this.project.texts.some(t => t.viz)) return;
+    for (const a of this.project.audio) {
+      void this.asset(a.mediaId).then(x => { if (x) void loadSpectrum(a.mediaId, () => getBlob(x)).then(() => { this.dirty = true; }); });
+    }
   }
 
   private fontsSeen = new Set<string>();
@@ -109,7 +119,6 @@ export class Player {
     if (hit) return hit;
     const el = document.createElement('video');
     el.playsInline = true; el.preload = 'auto'; el.crossOrigin = 'anonymous'; el.setAttribute('playsinline', '');
-    (el as unknown as { preservesPitch: boolean }).preservesPitch = false;
     const entry: VideoEntry = { el, url: '', ready: false, mediaId: clip.mediaId!, seeking: false };
     this.videos.set(clip.id, entry);
     el.addEventListener('loadeddata', () => { entry.ready = true; this.dirty = true; });
@@ -159,8 +168,9 @@ export class Player {
     const want = Math.min(clip.out - 0.02, sourceTime(clip, this.t - start));
     const el = e.el;
     if (!e.ready) return;
-    el.volume = Math.max(0, Math.min(1, clip.muted ? 0 : clip.volume * gain));
-    el.playbackRate = clip.speed;
+    el.volume = Math.max(0, Math.min(1, clip.muted || hasRamp(clip) ? 0 : clip.volume * gain));
+    el.playbackRate = sourceRate(clip, this.t - start);
+    (el as unknown as { preservesPitch: boolean }).preservesPitch = clip.keepPitch !== false;
     if (this.playing) {
       if (Math.abs(el.currentTime - want) > 0.3 && !e.seeking) { e.seeking = true; el.currentTime = want; }
       if (el.paused) el.play().catch(() => { /* the next tick retries */ });

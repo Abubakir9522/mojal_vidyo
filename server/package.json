@@ -1,6 +1,6 @@
 {
-  "name": "mojal-video-server",
-  "version": "1.0.0",
+  "name": "vodiy-vidyo-edit-server",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.13" },

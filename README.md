@@ -1,4 +1,4 @@
-# Mo'jal Video
+# Vodiy Vidyo Edit
 
 Android uchun vidyo muharrir, server bazasi va veb admin panel.
 
@@ -14,7 +14,8 @@ Android uchun vidyo muharrir, server bazasi va veb admin panel.
 
 1. Kodni GitHub repoga joylang.
 2. Actions bo'limida `Android APK` ishga tushadi.
-3. Tayyor APK Releases bo'limidagi `apk-latest` sahifasida bo'ladi.
+3. Sinovlar o'tgach, tayyor APK Releases bo'limida chiqadi. Oxirgi versiya har doim shu manzilda:
+   `https://github.com/Abubakir9522/mojal_vidyo/releases/latest/download/VodiyVidyoEdit.apk`
 
 Ilovaga server manzili kiritilishi uchun repo sozlamalarida `SERVER_URL` o'zgaruvchisini qo'shing
 (Settings, Secrets and variables, Actions, Variables). Manzilni ilovaning Hisobim bo'limida ham kiritsa bo'ladi.

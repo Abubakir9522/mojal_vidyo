@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @CapacitorPlugin(name = "MojalMedia")
 public class MojalMediaPlugin extends Plugin {
 
-    private static final String FOLDER = "Mojal Video";
+    private static final String FOLDER = "Vodiy Vidyo Edit";
 
     private static final class Session {
         OutputStream out;

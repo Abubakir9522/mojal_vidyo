@@ -6,6 +6,7 @@ import { Scene3DRenderer } from './scene3d';
 import { ASPECTS, Clip, MediaAsset, Project } from './types';
 import { activeMain, activeOverlays, clipDuration, layoutMain, projectDuration, sourceTime } from './timeline';
 import { getAsset, getBlob, getImage } from '../store/media';
+import { loadSpectrum } from '../auto/spectrum';
 
 export interface ExportOptions { height: number; fps: number; quality: 'normal' | 'high' | 'max'; }
 export interface ExportResult { file: Blob; name: string; duration: number; width: number; height: number; size: number; codec: string; seconds: number }
@@ -169,7 +170,8 @@ export async function exportProject(project: Project, opts: ExportOptions, onPro
   onProgress(0, 'Tayyorlanmoqda');
   for (const c of [...project.main, ...project.overlays]) if (c.kind === 'scene3d') await scenes.prepare(c, w, h);
   await document.fonts.ready;
-  for (const tc of project.texts) await document.fonts.load(`${tc.weight} 40px "${tc.font}"`, tc.text).catch(() => []);
+  if (project.texts.some(t => t.viz)) for (const a of project.audio) if (assets.has(a.mediaId)) await loadSpectrum(a.mediaId, () => blobOf(a.mediaId));
+  for (const tc of project.texts) if (!tc.viz) await document.fonts.load(`${tc.weight} 40px "${tc.font}"`, tc.text).catch(() => []);
 
   const images = new Map<string, ImageBitmap>();
   let wake: WakeLockSentinel | null = null;

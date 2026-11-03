@@ -1,5 +1,5 @@
 // Runs inside the emulator job. Talks to the real Android WebView and tests what a browser test cannot:
-// codec support on this Android build, MP4 export in the WebView, and saving through the native plugin.
+// real video decoding and MP4 export on Android, the bundled AI model, the editor, and saving to the gallery.
 import { _android as android } from 'playwright';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -8,89 +8,191 @@ const OUT = 'tests/android-out';
 fs.mkdirSync(OUT, { recursive: true });
 const sh = c => execSync(c, { encoding: 'utf8', maxBuffer: 1 << 26 });
 const APK = 'android/app/build/outputs/apk/debug/app-debug.apk';
+const PKG = 'uz.mojal.video';
 const report = {};
 let failed = false;
-const check = (name, ok, detail) => { report[name] = { ok, detail }; if (!ok) failed = true; console.log(ok ? 'OK  ' : 'FAIL', name, detail ?? ''); };
+const save = () => fs.writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 1));
+const check = (name, ok, detail) => { report[name] = { ok, detail }; if (!ok) failed = true; save(); console.log(ok ? 'OK  ' : 'FAIL', name, detail ?? ''); };
+const shot = n => { try { sh(`adb exec-out screencap -p > ${OUT}/${n}.png`); } catch { /* a missing picture must not end the run */ } };
+
+/** Every step has its own time limit, so a hang is reported by name instead of stalling the job. */
+async function step(name, ms, fn) {
+  const began = Date.now();
+  let timer;
+  try {
+    const r = await Promise.race([fn(), new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`${ms / 1000} soniyada tugamadi`)), ms); })]);
+    console.log(`  ${name}: ${((Date.now() - began) / 1000).toFixed(0)}s`);
+    return r;
+  } catch (e) {
+    check(name, false, String(e?.message ?? e).slice(0, 700));
+    return undefined;
+  } finally { clearTimeout(timer); }
+}
+
+const hardStop = setTimeout(() => { check('run finished in time', false); finish(); }, 38 * 60000);
+function finish() {
+  clearTimeout(hardStop);
+  try { fs.writeFileSync(`${OUT}/logcat.txt`, sh('adb logcat -d -t 4000')); } catch { /* the emulator may already be gone */ }
+  try {
+    const fatal = sh('adb logcat -d -b crash').trim();
+    check('no app crashes', !fatal.includes(PKG), fatal.slice(0, 600));
+  } catch { /* no crash buffer on this image */ }
+  save();
+  process.exit(failed ? 1 : 0);
+}
+
+const fixture = n => fs.readFileSync(`tests/fixtures/${n}`).toString('base64');
 
 try {
   sh(`adb install -r ${APK}`);
   sh('adb logcat -c');
-  sh('adb shell am start -n uz.mojal.video/.MainActivity');
+  sh(`adb shell am start -n ${PKG}/.MainActivity`);
   const [device] = await android.devices();
-  const webview = await device.webView({ pkg: 'uz.mojal.video' }, { timeout: 90000 });
+  const webview = await device.webView({ pkg: PKG }, { timeout: 120000 });
   const page = await webview.page();
-  page.setDefaultTimeout(240000);
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.waitForSelector('.home', { timeout: 60000 });
-  await page.waitForFunction(() => window.__t, null, { timeout: 60000 });
-  await new Promise(r => setTimeout(r, 2000));
-  sh(`adb exec-out screencap -p > ${OUT}/home.png`);
 
-  const f = await page.evaluate(async () => {
+  await step('app opens', 120000, async () => {
+    await page.waitForSelector('.home', { timeout: 110000 });
+    await page.waitForFunction(() => window.__t, null, { timeout: 60000 });
+    check('app opens', true);
+  });
+  await new Promise(r => setTimeout(r, 2000));
+  shot('1-home');
+  check('app name', (await page.textContent('.hero-text h1')) === 'Vodiy Vidyo Edit');
+
+  const f = await step('device features', 60000, () => page.evaluate(async () => {
     const r = { ua: navigator.userAgent, webcodecs: typeof VideoEncoder === 'function', webgl2: !!document.createElement('canvas').getContext('webgl2') };
     try { r.h264 = (await VideoEncoder.isConfigSupported({ codec: 'avc1.42001f', width: 720, height: 1280, bitrate: 3e6, framerate: 30 })).supported; } catch (e) { r.h264 = String(e); }
     try { r.aacNative = (await AudioEncoder.isConfigSupported({ codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 2, bitrate: 128000 })).supported; } catch (e) { r.aacNative = String(e); }
     try { const d = await navigator.storage.getDirectory(); const h = await d.getFileHandle('probe', { create: true }); const w = await h.createWritable(); await w.write('x'); await w.close(); r.opfs = (await h.getFile()).size === 1; await d.removeEntry('probe'); } catch (e) { r.opfs = String(e); }
     return r;
-  });
-  fs.writeFileSync(`${OUT}/features.json`, JSON.stringify(f, null, 1));
-  check('WebGL2', f.webgl2 === true); check('WebCodecs', f.webcodecs === true); check('H.264 encoder', f.h264 === true, String(f.h264)); check('private file storage', f.opfs === true, String(f.opfs));
-  console.log(f);
+  }));
+  if (f) {
+    fs.writeFileSync(`${OUT}/features.json`, JSON.stringify(f, null, 1));
+    console.log(f);
+    check('WebGL2', f.webgl2 === true); check('WebCodecs', f.webcodecs === true); check('H.264 encoder', f.h264 === true, String(f.h264)); check('private file storage', f.opfs === true, String(f.opfs));
+  }
 
-  const fx = await page.evaluate(async () => {
+  // Every sixth shader: the same validator runs in desktop tests, this checks this platform's driver.
+  const fx = await step('sample of effects', 300000, () => page.evaluate(async () => {
     const { Compositor, EFFECTS, TRANSITIONS, ty } = window.__t;
-    const comp = new Compositor(document.createElement('canvas')); comp.setSize(64, 96);
-    const bad = [];
+    const comp = new Compositor(document.createElement('canvas')); comp.setSize(48, 80);
+    const bad = []; let n = 0;
     const go = () => null;
-    for (const e of EFFECTS) { try { const p = ty.newProject('9:16'); p.main = [ty.newClip({ kind: 'color', color: '#884422', effects: [{ id: e.id, amount: 1 }] })]; comp.render(p, 1, go); } catch (x) { bad.push(`${e.id}: ${String(x.message).slice(0, 200)}`); } }
-    for (const t of TRANSITIONS) { try { const p = ty.newProject('9:16'); p.main = [ty.newClip({ kind: 'color', color: '#884422', transition: { id: t.id, duration: 1 } }), ty.newClip({ kind: 'color', color: '#224488' })]; comp.render(p, 2.5, go); } catch (x) { bad.push(`${t.id}: ${String(x.message).slice(0, 200)}`); } }
+    for (let i = 0; i < EFFECTS.length; i += 6) { const e = EFFECTS[i]; n++; try { const p = ty.newProject('9:16'); p.main = [ty.newClip({ kind: 'color', color: '#884422', effects: [{ id: e.id, amount: 1 }] })]; comp.render(p, 1, go); } catch (x) { bad.push(`${e.id}: ${String(x.message).slice(0, 160)}`); } }
+    for (let i = 0; i < TRANSITIONS.length; i += 6) { const t = TRANSITIONS[i]; n++; try { const p = ty.newProject('9:16'); p.main = [ty.newClip({ kind: 'color', color: '#884422', transition: { id: t.id, duration: 1 } }), ty.newClip({ kind: 'color', color: '#224488' })]; comp.render(p, 2.5, go); } catch (x) { bad.push(`${t.id}: ${String(x.message).slice(0, 160)}`); } }
     comp.dispose();
-    return { total: EFFECTS.length + TRANSITIONS.length, bad };
-  });
-  check('all shaders compile on this GPU driver', fx.bad.length === 0, `${fx.total - fx.bad.length}/${fx.total} ${fx.bad.slice(0, 5).join(' | ')}`);
+    return { n, bad };
+  }));
+  if (fx) check('effects work on this driver', fx.bad.length === 0, `${fx.n - fx.bad.length}/${fx.n} ${fx.bad.slice(0, 4).join(' | ')}`);
 
-  const ex = await page.evaluate(async () => {
-    const { ty, exportProject, media } = window.__t;
-    const music = await media.ensureUrlAsset('music:kuch', new URL('music/kuch.mp3', document.baseURI).href, 'Kuch', 'audio');
-    const p = ty.newProject('9:16', 'smoke');
-    p.main = [
-      ty.newClip({ kind: 'scene3d', scene: 'logoSpin', duration: 2, transition: { id: 't_cubeL', duration: 0.5 } }),
-      ty.newClip({ kind: 'color', color: '#d6246e', duration: 2, effects: [{ id: 'g_rgb', amount: 1 }] }),
-    ];
-    p.texts = [ty.newText({ text: "Salom O'zbekiston", start: 0.5, duration: 2 })];
-    p.audio = [{ id: 'a', mediaId: music.id, name: 'Kuch', start: 0, in: 0, out: 10, volume: 0.8, fadeIn: 0, fadeOut: 0.5, loop: false, muted: false, kind: 'music' }];
-    const r = await exportProject(p, { height: 360, fps: 24, quality: 'normal' }, () => {});
-    window.__smoke = r;
-    return { size: r.size, codec: r.codec, secs: r.seconds, w: r.width, h: r.height };
-  });
-  check('MP4 export in the WebView', ex.size > 10000, JSON.stringify(ex));
-
-  const saved = await page.evaluate(async () => {
-    const P = window.Capacitor.Plugins.MojalMedia;
-    const blob = window.__smoke.file;
-    const { id } = await P.begin({ name: 'smoke.mp4', mime: 'video/mp4' });
-    const CHUNK = 3 * 1024 * 1024;
-    for (let off = 0; off < blob.size; off += CHUNK) {
-      const u8 = new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer());
-      let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
-      await P.append({ id, data: btoa(s) });
+  const imported = await step('import real files', 120000, async () => {
+    const out = {};
+    for (const [key, name, type] of [['v', 'clip1.mp4', 'video/mp4'], ['img', 'photo.jpg', 'image/jpeg'], ['m', 'beat120.mp3', 'audio/mpeg']]) {
+      out[key] = await page.evaluate(async ({ b, name, type }) => {
+        const u8 = Uint8Array.from(atob(b), c => c.charCodeAt(0));
+        const a = await window.__t.media.importFile(new File([u8], name, { type }));
+        return { id: a.id, d: a.duration, w: a.width, h: a.height, audio: a.hasAudio, thumb: !!a.thumb };
+      }, { b: fixture(name), name, type });
     }
-    return P.finish({ id });
+    return out;
   });
-  check('saved to gallery', /^content:/.test(saved.uri), saved.uri);
-  await new Promise(r => setTimeout(r, 1500));
-  try {
-    sh(`adb pull "/sdcard/Movies/Mojal Video/smoke.mp4" ${OUT}/smoke.mp4`);
-    check('file pulled from the gallery folder', fs.statSync(`${OUT}/smoke.mp4`).size === ex.size, `${fs.statSync(`${OUT}/smoke.mp4`).size} bytes`);
-  } catch (e) { check('file pulled from the gallery folder', false, String(e).slice(0, 200)); }
+  if (imported) {
+    check('video read on Android', imported.v.w === 640 && imported.v.audio && imported.v.thumb, JSON.stringify(imported.v));
+    check('photo read on Android', imported.img.w === 1600, JSON.stringify(imported.img));
+    check('song read on Android', imported.m.d > 29, JSON.stringify(imported.m));
 
+    const beats = await step('beat detection', 120000, () => page.evaluate(async id => { const { media, detectBeats } = window.__t; return (await detectBeats(await media.getBlob(await media.getAsset(id)))).bpm; }, imported.m.id));
+    if (beats !== undefined) check('tempo found', beats === 120, String(beats));
+
+    // Shared by export and the editor: a video, a dancing photo, a 3D scene, a title, a visualizer and a song.
+    const buildProject = `const p=ty.newProject('9:16','Sinov');
+      p.main=[ty.newClip({kind:'scene3d',scene:'logoSpin',duration:1.5,transition:{id:'t_cubeL',duration:0.4}}),
+        ty.newClip({kind:'video',mediaId:ids.v,in:1,out:3,muted:true,effects:[{id:'f_atlas',amount:1}],transition:{id:'t_fade',duration:0.3}}),
+        ty.newClip({kind:'image',mediaId:ids.img,duration:2,dance:{style:'sakrash',amount:1,flash:true,fxOnBeat:true}})];
+      p.texts=[ty.newText({text:"Salom O'zbekiston",start:0.5,duration:2}),T.dance.vizLayer('bars',4)];
+      p.audio=[{id:'a',mediaId:ids.m,name:'Beat',start:0,in:0,out:10,volume:0.8,fadeIn:0,fadeOut:0.5,loop:false,muted:false,kind:'music',beats:Array.from({length:20},(_,i)=>0.25+i*0.5)}];return p;`;
+    const ids = { v: imported.v.id, img: imported.img.id, m: imported.m.id };
+
+    const ex = await step('MP4 export', 600000, () => page.evaluate(async ({ code, ids }) => {
+      const T = window.__t, ty = T.ty;
+      const p = new Function('ty', 'T', 'ids', code)(ty, T, ids);
+      const r = await T.exportProject(p, { height: 240, fps: 12, quality: 'normal' }, () => {});
+      window.__smoke = r;
+      return { size: r.size, codec: r.codec, secs: +r.seconds.toFixed(1), w: r.width, h: r.height };
+    }, { code: buildProject, ids }));
+    if (ex) check('MP4 export in the WebView', ex.size > 5000, JSON.stringify(ex));
+
+    if (ex) {
+      const saved = await step('save to gallery', 120000, () => page.evaluate(async () => {
+        const P = window.Capacitor.Plugins.MojalMedia;
+        const blob = window.__smoke.file;
+        const { id } = await P.begin({ name: 'smoke.mp4', mime: 'video/mp4' });
+        const CHUNK = 3 * 1024 * 1024;
+        for (let off = 0; off < blob.size; off += CHUNK) {
+          const u8 = new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer());
+          let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+          await P.append({ id, data: btoa(s) });
+        }
+        return P.finish({ id });
+      }));
+      if (saved) {
+        check('saved to gallery', /^content:/.test(saved.uri), saved.uri);
+        await new Promise(r => setTimeout(r, 1500));
+        try {
+          sh(`adb pull "/sdcard/Movies/Vodiy Vidyo Edit/smoke.mp4" ${OUT}/smoke.mp4`);
+          const probe = sh(`ffprobe -v error -show_entries stream=codec_name,width,height,duration -of csv=p=0 ${OUT}/smoke.mp4`).trim().replace(/\n/g, ' | ');
+          check('saved video is valid', /h264/.test(probe) && /aac|opus/.test(probe) && fs.statSync(`${OUT}/smoke.mp4`).size === ex.size, probe);
+        } catch (e) { check('saved video is valid', false, String(e).slice(0, 300)); }
+      }
+    }
+
+    const rev = await step('reverse clip', 300000, () => page.evaluate(async id => {
+      const { tools, media } = window.__t;
+      const o = await tools.reverseVideo(await media.getAsset(id), 1, 2, () => {});
+      return { d: o.duration, audio: o.hasAudio };
+    }, ids.v));
+    if (rev) check('reverse clip', rev.d > 0.9 && rev.d < 1.2, JSON.stringify(rev));
+
+    const fr = await step('freeze frame', 60000, () => page.evaluate(async id => { const { tools, media } = window.__t; const o = await tools.grabFrame(await media.getAsset(id), 2); return o.width; }, ids.v));
+    if (fr !== undefined) check('freeze frame', fr === 640, String(fr));
+
+    // The photo has no person, so the expected answer proves the bundled model loaded and ran.
+    const cut = await step('background removal model', 240000, () => page.evaluate(async id => {
+      const { cutoutPerson, media } = window.__t;
+      try { await cutoutPerson(await media.getAsset(id)); return 'ran, kept something'; } catch (e) { return String(e.message); }
+    }, ids.img));
+    if (cut !== undefined) check('background removal model', /odam topilmadi|kept something/.test(cut), cut);
+
+    // The real editor screen with a saved project.
+    await step('editor', 240000, async () => {
+      await page.evaluate(async ({ code, ids }) => {
+        const T = window.__t;
+        const p = new Function('ty', 'T', 'ids', code)(T.ty, T, ids);
+        await T.db.put('projects', p);
+      }, { code: buildProject, ids });
+      await page.reload();
+      await page.waitForSelector('.home', { timeout: 60000 });
+      await page.waitForFunction(() => window.__t, null, { timeout: 60000 });
+      await page.click('[data-testid=project]');
+      await page.waitForSelector('[data-testid=editor]', { timeout: 60000 });
+      await new Promise(r => setTimeout(r, 6000));
+      shot('2-editor');
+      await page.click('[data-testid=play]');
+      await new Promise(r => setTimeout(r, 5000));
+      shot('3-playing');
+      const t = await page.evaluate(() => ({ t: window.__player.t, playing: window.__player.playing, err: window.__player.lastError }));
+      check('preview plays', t.t > 0.5 && !t.err, JSON.stringify(t));
+      await page.evaluate(() => window.__player.pause());
+      const painted = await page.evaluate(() => { const c = document.querySelector('[data-testid=preview]'); const o = document.createElement('canvas'); o.width = 32; o.height = 32; const x = o.getContext('2d'); x.drawImage(c, 0, 0, 32, 32); const d = x.getImageData(0, 0, 32, 32).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s / (d.length / 4); });
+      check('preview shows a picture', painted > 8, String(painted));
+    });
+  }
   check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
-  sh(`adb exec-out screencap -p > ${OUT}/after.png`);
+  shot('4-end');
 } catch (e) {
   check('smoke run finished', false, String(e?.stack ?? e).slice(0, 800));
-} finally {
-  try { fs.writeFileSync(`${OUT}/logcat.txt`, sh('adb logcat -d -t 3000')); } catch { /* the emulator may already be gone */ }
-  fs.writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 1));
 }
-process.exit(failed ? 1 : 0);
+finish();

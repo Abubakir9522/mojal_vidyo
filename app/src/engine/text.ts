@@ -1,4 +1,5 @@
 import type { TextClip } from './types';
+import { keyframedValues, beatAt } from './timeline';
 
 const ease = (x: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
 const backOut = (x: number) => { const c = 1.70158; x = Math.min(1, x); return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
@@ -30,7 +31,10 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
 }
 
 /** Draws one text or sticker clip on a 2D canvas at the given local time. Same code for preview and export. */
-export function drawText(ctx: CanvasRenderingContext2D, tc: TextClip, local: number, W: number, H: number) {
+export function drawText(ctx: CanvasRenderingContext2D, tc: TextClip, local: number, W: number, H: number, spectrum: Uint8Array | null = null, beats: number[] = [], t = 0) {
+  if (tc.viz) { drawViz(ctx, tc, local, W, H, spectrum, beats, t); return; }
+  const kf = keyframedValues(tc.keyframes, local);
+  if (kf) tc = { ...tc, x: kf.x, y: kf.y, scale: kf.scale, rotation: kf.rotation };
   const px = (tc.size / 100) * H;
   const dIn = Math.min(ANIM, tc.duration * 0.4), dOut = Math.min(ANIM, tc.duration * 0.4);
   const pin = dIn > 0 ? Math.min(1, local / dIn) : 1;
@@ -150,5 +154,71 @@ export function drawText(ctx: CanvasRenderingContext2D, tc: TextClip, local: num
     shown += line.length + 1;
   });
   lines = [];
+  ctx.restore();
+}
+
+/** Draws a music visualizer from the song's frequency bands, for preview and export alike. */
+function drawViz(ctx: CanvasRenderingContext2D, tc: TextClip, local: number, W: number, H: number, spec: Uint8Array | null, beats: number[], t: number) {
+  const n = spec?.length ?? 16;
+  // With no analysed song yet, the bars follow the beat so the layer never looks broken.
+  const b = beatAt(beats, t);
+  const v = (i: number) => (spec ? spec[i] / 255 : Math.max(0.05, b.pulse * (0.5 + 0.5 * Math.sin(i * 1.7 + b.index))));
+  const fade = Math.min(1, local / 0.2, (tc.duration - local) / 0.2);
+  const w = W * 0.86 * tc.scale, h = H * (tc.size / 100) * 1.6 * tc.scale;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, fade);
+  ctx.translate(tc.x * W, tc.y * H);
+  ctx.rotate(tc.rotation);
+  let fill: string | CanvasGradient = tc.color;
+  if (tc.gradient && tc.gradient.length > 1) {
+    const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+    tc.gradient.forEach((c, i) => g.addColorStop(i / (tc.gradient!.length - 1), c));
+    fill = g;
+  }
+  ctx.fillStyle = fill; ctx.strokeStyle = fill;
+  if (tc.shadow) { ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = H * 0.006; }
+  const gap = w / n;
+  const bar = gap * 0.62;
+  if (tc.viz === 'bars' || tc.viz === 'mirror') {
+    for (let i = 0; i < n; i++) {
+      const bh = Math.max(bar, v(i) * h);
+      const x = -w / 2 + i * gap + (gap - bar) / 2;
+      ctx.beginPath();
+      if (tc.viz === 'bars') ctx.roundRect(x, h / 2 - bh, bar, bh, bar / 2);
+      else ctx.roundRect(x, -bh / 2, bar, bh, bar / 2);
+      ctx.fill();
+    }
+  } else if (tc.viz === 'circle') {
+    const r = Math.min(w, H * 0.3) * 0.32;
+    const m = n * 3;
+    ctx.lineWidth = Math.max(2, (r * 2 * Math.PI) / m * 0.55);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < m; i++) {
+      const a = (i / m) * Math.PI * 2 + local * 0.2;
+      const k = i % (n * 2);
+      const val = v(k < n ? k : n * 2 - 1 - k);
+      const r2 = r + 4 + val * r * 0.9;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r); ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2); ctx.stroke();
+    }
+  } else if (tc.viz === 'line') {
+    ctx.lineWidth = Math.max(2, H * 0.006); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = -w / 2 + (i / (n - 1)) * w;
+      const y = (i % 2 ? 1 : -1) * v(i) * h * 0.5;
+      if (i === 0) ctx.moveTo(x, y);
+      else { const px = -w / 2 + ((i - 1) / (n - 1)) * w; const py = (i % 2 ? -1 : 1) * v(i - 1) * h * 0.5; ctx.bezierCurveTo((px + x) / 2, py, (px + x) / 2, y, x, y); }
+    }
+    ctx.stroke();
+  } else {
+    const rows = 7;
+    for (let i = 0; i < n; i++) {
+      const lit = Math.round(v(i) * rows);
+      for (let r = 0; r < rows; r++) {
+        ctx.globalAlpha = Math.max(0, fade) * (r < lit ? 1 : 0.14);
+        ctx.beginPath(); ctx.arc(-w / 2 + (i + 0.5) * gap, h / 2 - (r + 0.5) * (h / rows), Math.min(bar, h / rows) * 0.42, 0, 7); ctx.fill();
+      }
+    }
+  }
   ctx.restore();
 }

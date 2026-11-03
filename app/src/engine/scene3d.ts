@@ -6,7 +6,7 @@ import type { Clip, SceneParams } from './types';
 export interface SceneDef { id: string; name: string; images: number; text: string; sub?: string; colors: string[] }
 
 export const SCENES: SceneDef[] = [
-  { id: 'logoSpin', name: 'Oltin logotip', images: 0, text: "MO'JAL", sub: 'Ishonch tarmog\'i', colors: ['#120a2a', '#ffc53d', '#ff3d81'] },
+  { id: 'logoSpin', name: 'Oltin logotip', images: 0, text: 'VODIY', sub: 'Vidyo Edit', colors: ['#120a2a', '#ffc53d', '#ff3d81'] },
   { id: 'textFly', name: 'Uchuvchi harflar', images: 0, text: 'YANGILIK', sub: 'Bugun boshlanadi', colors: ['#06142e', '#39d6c6', '#ffffff'] },
   { id: 'cubePhotos', name: 'Rasmli kub', images: 6, text: '', colors: ['#0d0f26', '#7b5cff', '#ffc53d'] },
   { id: 'carousel', name: 'Aylanma galereya', images: 8, text: 'Xotiralar', colors: ['#0b1226', '#39d6c6', '#ffffff'] },
@@ -20,7 +20,7 @@ export const SCENES: SceneDef[] = [
   { id: 'synthwave', name: 'Neon ufq', images: 0, text: 'RETRO', sub: '80-yillar', colors: ['#14012b', '#ff2fa0', '#29e7ff'] },
   { id: 'confetti', name: 'Bayram konfettisi', images: 0, text: 'TABRIKLAYMIZ', sub: "Tug'ilgan kuningiz bilan", colors: ['#1a0d33', '#ffc53d', '#ff5fa2'] },
   { id: 'coins', name: 'Oltin tangalar', images: 0, text: 'CHEGIRMA', sub: '50% gacha', colors: ['#190b05', '#ffc53d', '#ff7a1a'] },
-  { id: 'phone', name: '3D telefon', images: 1, text: 'CHIROYLI RAQAMLAR', sub: "Mo'jal do'konida", colors: ['#0a1630', '#39d6c6', '#ffffff'] },
+  { id: 'phone', name: '3D telefon', images: 1, text: 'CHIROYLI RAQAMLAR', sub: "Do'konimizda", colors: ['#0a1630', '#39d6c6', '#ffffff'] },
   { id: 'stackCards', name: 'Rasmlar dastasi', images: 5, text: '', colors: ['#1a1030', '#ff5fa2', '#ffc53d'] },
   { id: 'waves', name: "3D to'lqinlar", images: 0, text: 'SAYOHAT', sub: 'Sarguzasht kutmoqda', colors: ['#031827', '#18b7c9', '#ffffff'] },
   { id: 'crystal', name: 'Billur', images: 0, text: 'PREMIUM', sub: 'Sifat kafolati', colors: ['#0c0a1e', '#b89bff', '#ffffff'] },

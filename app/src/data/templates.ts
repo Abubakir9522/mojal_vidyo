@@ -5,7 +5,7 @@ export const CATEGORIES = [
   { id: 'savdo', name: 'Savdo va reklama' }, { id: 'tugilgan', name: "Tug'ilgan kun" }, { id: 'toy', name: "To'y va oila" },
   { id: 'bayram', name: 'Bayramlar' }, { id: 'sayohat', name: 'Sayohat' }, { id: 'sport', name: 'Sport' },
   { id: 'vlog', name: 'Vlog va kundalik' }, { id: 'kino', name: 'Kino uslubi' }, { id: 'ritm', name: 'Ritmli montaj' },
-  { id: 'slayd', name: 'Rasmlar slaydi' }, { id: 'neon', name: 'Neon va glitch' }, { id: 'intro', name: '3D intro va logotip' },
+  { id: 'raqs', name: "Musiqaga o'ynash" }, { id: 'slayd', name: 'Rasmlar slaydi' }, { id: 'neon', name: 'Neon va glitch' }, { id: 'intro', name: '3D intro va logotip' },
 ] as const;
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
 
@@ -30,6 +30,8 @@ export interface Template {
   background?: string;
   /** Marks a template that came from the admin panel. */
   remote?: boolean;
+  /** Pictures move to the song's beats, and cuts land on them. */
+  dance?: { style: string; step: number; amount?: number; flash?: boolean; viz?: 'bars' | 'mirror' | 'circle' | 'line' | 'dots' };
   thumb?: string;
   featured?: boolean;
 }
@@ -39,9 +41,9 @@ const white = '#ffffff', gold = '#ffc53d', pink = '#ff5fa2', teal = '#39d6c6', v
 type Row = Omit<Template, 'cat' | 'aspect' | 'transitions' | 'motions' | 'effects' | 'texts'> & { aspect?: AspectId; fx?: string[][]; tr?: string[]; mo?: string[]; texts?: TplText[] };
 
 const R = (cat: CategoryId, defaults: Partial<Row>, rows: Row[]): Template[] => rows.map(r => ({
-  cat, aspect: r.aspect ?? defaults.aspect ?? '9:16',
+  ...r, cat, aspect: r.aspect ?? defaults.aspect ?? '9:16',
   effects: r.fx ?? defaults.fx ?? [[]], transitions: r.tr ?? defaults.tr ?? ['t_fade'], motions: r.mo ?? defaults.mo ?? ['zoomIn', 'zoomOut'],
-  texts: r.texts ?? [], music: defaults.music, transitionLen: defaults.transitionLen, ...r,
+  texts: r.texts ?? [], music: r.music ?? defaults.music, transitionLen: r.transitionLen ?? defaults.transitionLen,
 } as Template));
 
 const title = (text: string, o: Partial<TplText> = {}): TplText => ({ text, at: 0.2, dur: 2.6, y: 0.5, size: 8, anim: 'pop', ...o });
@@ -50,7 +52,7 @@ const low = (text: string, o: Partial<TplText> = {}): TplText => ({ text, at: 0.
 const SAVDO = R('savdo', { music: 'kuch', tr: ['t_slideL', 't_whipL', 't_zoomIn'], mo: ['zoomIn', 'panLeft', 'zoomInFast'], transitionLen: 0.35 }, [
   { id: 'sv_chegirma', name: 'Katta chegirma', slots: 4, rhythm: [1.6], intro: { scene: 'coins', text: 'CHEGIRMA', sub: '50% gacha' }, fx: [['f_vivid']], texts: [low("Faqat shu hafta!", { bg: red })], outro: { scene: 'logoSpin', text: "DO'KONGA KELING", sub: 'Manzil va telefon' }, featured: true },
   { id: 'sv_yangi', name: 'Yangi mahsulot', slots: 3, rhythm: [2.2], intro: { scene: 'podium', text: 'YANGI MAHSULOT', sub: 'Faqat bizda' }, fx: [['f_clean']], tr: ['t_flipY', 't_cubeL'], captions: ['Sifatli', 'Hamyonbop', 'Kafolatli'], captionStyle: { y: 0.82, font: 'Russo One', color: gold } },
-  { id: 'sv_raqam', name: 'Chiroyli raqamlar', slots: 3, rhythm: [2], intro: { scene: 'phone', text: 'CHIROYLI RAQAMLAR', sub: "Mo'jal do'konida" }, fx: [['f_cyber']], captions: ['90 000 XX XX', '91 777 XX XX', '99 555 XX XX'], captionStyle: { y: 0.5, size: 8, font: 'Oswald', color: white, bg: '#111a3acc' }, outro: { scene: 'textFly', text: "MO'JAL", sub: 'Ishonch tarmog\'i' }, featured: true },
+  { id: 'sv_raqam', name: 'Chiroyli raqamlar', slots: 3, rhythm: [2], intro: { scene: 'phone', text: 'CHIROYLI RAQAMLAR', sub: "Mo'jal do'konida" }, fx: [['f_cyber']], captions: ['90 000 XX XX', '91 777 XX XX', '99 555 XX XX'], captionStyle: { y: 0.5, size: 8, font: 'Oswald', color: white, bg: '#111a3acc' }, outro: { scene: 'textFly', text: "DO'KONIMIZ", sub: 'Ishonchli xizmat' }, featured: true },
   { id: 'sv_tarif', name: 'Yangi tarif', slots: 3, rhythm: [2.4], fx: [['f_rishton']], tr: ['t_diag', 't_doors'], texts: [title('YANGI TARIF', { color: teal, font: 'Oswald' }), low("Ko'proq internet, kamroq to'lov", { at: 2.6, dur: 4 })] },
   { id: 'sv_aksiya', name: 'Aksiya 1+1', slots: 4, rhythm: [1.2, 1.2, 1.8], fx: [['l_flare'], ['f_pop']], tr: ['t_flash', 't_glitch'], texts: [title('1 + 1', { size: 16, font: 'Russo One', color: gold, loop: 'pulse', dur: 4 }), low('Bittasini olsangiz, ikkinchisi sovg\'a', { at: 2 })] },
   { id: 'sv_ochilish', name: "Do'kon ochilishi", slots: 4, rhythm: [2], intro: { scene: 'confetti', text: 'OCHILDIK!', sub: 'Yangi manzilda' }, fx: [['f_summer']], tr: ['t_circle', 't_star'], texts: [low('Barchani kutib qolamiz', { bg: ink, at: 1 })] },
@@ -200,7 +202,30 @@ const INTRO = R('intro', { music: 'kino', tr: ['t_fade'], mo: ['none'] }, [
   { id: 'in_podium', name: 'Mahsulot sahnasi', slots: 1, rhythm: [2.4], intro: { scene: 'podium', dur: 5 }, fx: [[]] },
 ]);
 
-export const TEMPLATES: Template[] = [...SAVDO, ...TUGILGAN, ...TOY, ...BAYRAM, ...SAYOHAT, ...SPORT, ...VLOG, ...KINO, ...RITM, ...SLAYD, ...NEON, ...INTRO];
+const RAQS = R('raqs', { music: 'kuch', tr: ['t_flash'], mo: ['none'], transitionLen: 0.05 }, [
+  { id: 'rq_zarba', name: 'Zarbali rasmlar', slots: 8, rhythm: [0.94], dance: { style: 'sakrash', step: 2, flash: true }, featured: true },
+  { id: 'rq_yurak', name: 'Yurak urishi', slots: 8, rhythm: [1.02], music: 'quvnoq', dance: { style: 'yurak', step: 2 }, fx: [['f_rose']] },
+  { id: 'rq_chayqalish', name: 'Chayqaluvchi rasmlar', slots: 8, rhythm: [1.09], music: 'bayram', dance: { style: 'chayqalish', step: 2 }, fx: [['f_summer']], featured: true },
+  { id: 'rq_sakrash', name: 'Sakrovchi rasmlar', slots: 8, rhythm: [1.02], music: 'quvnoq', dance: { style: 'sakrab', step: 2 }, fx: [['f_pop']] },
+  { id: 'rq_3d', name: '3D raqs', slots: 8, rhythm: [0.86], music: 'ritm', dance: { style: 'burilish3d', step: 2, flash: true }, fx: [['f_cyber']], featured: true },
+  { id: 'rq_3duchish', name: '3D uchish', slots: 8, rhythm: [1.88], music: 'kuch', dance: { style: 'kamera3d', step: 4, flash: true }, fx: [['l_flare']] },
+  { id: 'rq_egilish', name: '3D egilish', slots: 8, rhythm: [1.25], music: 'ufq', dance: { style: 'qiyalik3d', step: 2 }, fx: [['f_chimyon']] },
+  { id: 'rq_silkinish', name: 'Kuchli silkinish', slots: 8, rhythm: [0.43], music: 'ritm', dance: { style: 'silkinish', step: 1, flash: true }, fx: [['g_rgb']] },
+  { id: 'rq_robot', name: 'Robot raqsi', slots: 8, rhythm: [0.86], music: 'ritm', dance: { style: 'robot', step: 2 }, fx: [['s_posterize']] },
+  { id: 'rq_kozgu', name: "Ko'zgu raqsi", slots: 8, rhythm: [0.94], dance: { style: 'oyna', step: 2, flash: true }, fx: [['d_mirrorh']] },
+  { id: 'rq_aylanish', name: 'Aylanuvchi rasmlar', slots: 8, rhythm: [1.88], dance: { style: 'aylanish', step: 4 }, fx: [['d_kaleido'], []] },
+  { id: 'rq_zina', name: 'Yaqinlashuvchi zarba', slots: 6, rhythm: [1.88], dance: { style: 'zina', step: 4 }, fx: [['f_vivid']] },
+  { id: 'rq_toy', name: "To'y raqsi", slots: 8, rhythm: [1.09], music: 'bayram', dance: { style: 'suzish', step: 2, amount: 0.7 }, fx: [['f_gold'], ['l_sparkle']] },
+  { id: 'rq_bolalar', name: 'Quvnoq bolalar', slots: 8, rhythm: [1.02], music: 'quvnoq', dance: { style: 'sakrab', step: 2 }, fx: [['n_confetti']] },
+  { id: 'rq_ekvalayzer', name: 'Ekvalayzerli rasmlar', slots: 8, rhythm: [0.94], dance: { style: 'sakrash', step: 2, viz: 'bars' }, fx: [['f_teal']], featured: true },
+  { id: 'rq_doira', name: 'Doira ekvalayzer', slots: 6, rhythm: [1.88], music: 'ritm', dance: { style: 'bosish', step: 4, viz: 'circle' }, fx: [['l_vignette']] },
+  { id: 'rq_tolqin', name: "To'lqinli musiqa", slots: 6, rhythm: [1.88], music: 'ufq', dance: { style: 'suzish', step: 4, viz: 'line' }, fx: [['f_film']] },
+  { id: 'rq_nuqta', name: 'Nuqtali ekvalayzer', slots: 8, rhythm: [1.02], music: 'yengil', dance: { style: 'chayqalish', step: 2, amount: 0.7, viz: 'dots' }, fx: [['f_matte']] },
+  { id: 'rq_aralash', name: 'Aralash raqs', slots: 8, rhythm: [0.94], dance: { style: 'aralash', step: 2, flash: true }, fx: [['f_vivid']], featured: true },
+  { id: 'rq_keng', name: 'Keng ekran raqsi', slots: 8, rhythm: [0.94], aspect: '16:9', dance: { style: 'sakrash', step: 2, viz: 'mirror' }, fx: [['f_teal']] },
+]);
+
+export const TEMPLATES: Template[] = [...SAVDO, ...RAQS, ...TUGILGAN, ...TOY, ...BAYRAM, ...SAYOHAT, ...SPORT, ...VLOG, ...KINO, ...RITM, ...SLAYD, ...NEON, ...INTRO];
 
 export const MUSIC_TRACKS = [
   { id: 'kuch', name: 'Kuch', mood: 'Baquvvat' }, { id: 'quvnoq', name: 'Quvnoq', mood: 'Bayramona' }, { id: 'sokin', name: 'Sokin', mood: 'Romantik' },
@@ -259,7 +284,8 @@ export function applyTemplate(tpl: Template, media: MediaAsset[], musicAssetId?:
     }
   }
   if (tpl.outro) clips.push(sceneClip(tpl.outro));
-  clips.forEach((c, i) => { if (i < clips.length - 1) c.transition = { id: tpl.transitions[i % tpl.transitions.length], duration: tLen }; });
+  clips.forEach((c, i) => { if (i < clips.length - 1 && !tpl.dance) c.transition = { id: tpl.transitions[i % tpl.transitions.length], duration: tLen }; });
+  if (tpl.dance) for (const c of clips) if (c.kind !== 'scene3d') { c.dance = { style: tpl.dance.style, amount: tpl.dance.amount ?? 1, flash: !!tpl.dance.flash, fxOnBeat: true }; c.motion = 'none'; }
   p.main = clips;
 
   // Clip start times decide where captions land.
@@ -273,6 +299,10 @@ export function applyTemplate(tpl: Template, media: MediaAsset[], musicAssetId?:
     return { st, d };
   });
   const introDur = tpl.intro ? starts[0]?.d ?? 0 : 0;
+  if (tpl.dance?.viz) {
+    const dur = cursor;
+    p.texts.push(newText({ text: 'Ekvalayzer', viz: tpl.dance.viz, start: 0, duration: dur, size: tpl.dance.viz === 'circle' ? 16 : 11, y: tpl.dance.viz === 'circle' ? 0.5 : 0.86, gradient: ['#f5b301', '#d6246e', '#16a9b8'], animIn: 'none', animOut: 'none' }));
+  }
   for (const t of tpl.texts) p.texts.push(toTextClip({ ...t, at: (t.at ?? 0) + introDur }, 0, 3));
   if (tpl.captions) {
     const offset = tpl.intro ? 1 : 0;

@@ -87,7 +87,7 @@ export function Account({ open }: { nav: Nav; open: (p: Project) => void }) {
         <button class="btn" data-testid="server-save" onClick={async () => { try { await setServer(server); if (server) { await refreshCatalog(); ui.toast('Serverga ulandi'); } } catch (e) { ui.toast((e as Error).message, true); } }}>Ulanish</button>
 
         <h4>Ilova haqida</h4>
-        <p class="hint">Mo'jal Video 1.0. {COUNTS.templates} ta shablon, {COUNTS.effects} ta effekt, {COUNTS.transitions} ta o'tish, {COUNTS.scenes} ta 3D sahna, {COUNTS.motions} ta kamera harakati.</p>
+        <p class="hint">Vodiy Vidyo Edit 1.2. {COUNTS.templates} ta shablon, {COUNTS.effects} ta effekt, {COUNTS.transitions} ta o'tish, {COUNTS.scenes} ta 3D sahna, {COUNTS.motions} ta kamera harakati, {COUNTS.dances} ta musiqaga o'ynash uslubi.</p>
       </div>
     </>
   );

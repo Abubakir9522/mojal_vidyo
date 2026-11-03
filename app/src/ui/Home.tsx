@@ -60,7 +60,7 @@ export function Home({ nav, open }: { nav: Nav; open: (p: Project) => void }) {
       <div class="hero">
         <AtlasBand />
         <div class="hero-text">
-          <h1>Mo'jal Video</h1>
+          <h1>Vodiy Vidyo Edit</h1>
           <p>Telefoningizda vidyo yarating va tahrirlang</p>
         </div>
       </div>
@@ -84,6 +84,8 @@ export function Home({ nav, open }: { nav: Nav; open: (p: Project) => void }) {
 
       <div class="quick">
         <button data-testid="go-auto" onClick={() => nav({ name: 'auto' })}><Icon n="wand" /><b>Avto montaj</b><span>Fayllarni tanlang, ilova o'zi yig'adi</span></button>
+        <button data-testid="go-dance" onClick={() => nav({ name: 'dance' })}><Icon n="beat" /><b>Musiqaga o'ynatish</b><span>Rasmlar qo'shiq ritmiga harakatlanadi</span></button>
+        <button data-testid="go-ad" onClick={() => nav({ name: 'ad' })}><Icon n="bolt" /><b>Reklama ustasi</b><span>Ma'lumot yozing, reklama tayyor</span></button>
         <button data-testid="go-photo" onClick={() => nav({ name: 'photo' })}><Icon n="image" /><b>Rasmdan vidyo</b><span>Rasmlarni jonlantiring</span></button>
         <button data-testid="go-3d" onClick={() => nav({ name: 'templates', cat: 'intro' })}><Icon n="cube" /><b>3D vidyo</b><span>{COUNTS.scenes} ta 3D sahna</span></button>
         <button data-testid="go-tpl" onClick={() => nav({ name: 'templates' })}><Icon n="grid" /><b>Shablonlar</b><span>{COUNTS.templates} ta tayyor uslub</span></button>

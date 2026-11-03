@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'uz.mojal.video',
-  appName: "Mo'jal Video",
+  appName: "Vodiy Vidyo Edit",
   webDir: 'dist',
   android: { allowMixedContent: false, backgroundColor: '#11142a' },
   plugins: {

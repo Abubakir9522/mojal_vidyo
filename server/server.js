@@ -1,4 +1,4 @@
-// Mo'jal Video server: accounts, cloud projects, online catalog and the admin panel.
+// Vodiy Vidyo Edit server: accounts, cloud projects, online catalog and the admin panel.
 // No third-party packages: it runs on Node 22.13 or newer with nothing to install.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -132,6 +132,11 @@ function validateTemplate(t) {
   if (!Array.isArray(t.motions) || !t.motions.length || t.motions.some(id => !mo.has(id))) fail(400, "Noma'lum harakat tanlangan");
   for (const k of ['intro', 'outro']) if (t[k] && !sc.has(t[k].scene)) fail(400, "Noma'lum 3D sahna tanlangan");
   if (t.music && !mu.has(t.music)) fail(400, "Noma'lum musiqa tanlangan");
+  if (t.dance) {
+    const da = new Set((SEED.dances ?? []).map(e => e.id));
+    if (!da.has(t.dance.style) || ![1, 2, 4, 8].includes(t.dance.step)) fail(400, "Noma'lum harakat uslubi tanlangan");
+    if (!t.music) fail(400, "Musiqaga o'ynash uchun musiqa tanlang");
+  }
   if (!Array.isArray(t.texts) || t.texts.some(x => !x || typeof x.text !== 'string' || x.text.length > 300)) fail(400, "Matn noto'g'ri");
   return t;
 }
@@ -322,7 +327,7 @@ route('GET', '/api/admin/catalog', req => {
   const withFlags = (kind, list) => list.map(x => ({ ...x, hidden: !!o.get(`${kind}:${x.id}`)?.hidden, featured: edited ? !!o.get(`${kind}:${x.id}`)?.featured : !!x.featured }));
   return {
     templates: withFlags('template', SEED.templates), effects: withFlags('effect', SEED.effects), transitions: withFlags('transition', SEED.transitions), scenes: withFlags('scene', SEED.scenes),
-    motions: SEED.motions, music: SEED.music, categories: SEED.categories,
+    motions: SEED.motions, music: SEED.music, categories: SEED.categories, dances: SEED.dances,
   };
 });
 route('PUT', '/api/admin/override/:kind/:id', async (req, ctx) => {
@@ -470,6 +475,6 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) send(500, { error: 'Serverda xatolik yuz berdi' }); else res.end();
   }
 });
-server.listen(PORT, () => console.log(`Mo'jal Video server: http://localhost:${PORT}  admin: http://localhost:${PORT}/admin/`));
+server.listen(PORT, () => console.log(`Vodiy Vidyo Edit server: http://localhost:${PORT}  admin: http://localhost:${PORT}/admin/`));
 const stop = () => { server.close(); db.close(); process.exit(0); };
 process.on('SIGTERM', stop); process.on('SIGINT', stop);

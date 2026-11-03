@@ -39,7 +39,7 @@ function showLogin() {
     e.preventDefault();
     try { const r = await api('/api/admin/login', { method: 'POST', body: { password: pass.value } }); token = r.token; sessionStorage.setItem('admin', token); showApp(); }
     catch (x) { err.textContent = x.message; }
-  } }, $('h1', {}, "Mo'jal Video admin"), $('label', {}, 'Parol', pass), err, $('button', { class: 'primary', type: 'submit' }, 'Kirish')));
+  } }, $('h1', {}, "Vodiy Vidyo Edit admin"), $('label', {}, 'Parol', pass), err, $('button', { class: 'primary', type: 'submit' }, 'Kirish')));
   pass.focus();
 }
 
@@ -147,6 +147,7 @@ const pages = {
       const moP = picker(cat.motions, d.motions);
       const intro = $('select', { id: 'tpl-intro' }, $('option', { value: '' }, "Yo'q"), cat.scenes.map(s => $('option', { value: s.id, selected: d.intro?.scene === s.id }, s.name)));
       const introText = $('input', { value: d.intro?.text ?? '', id: 'tpl-intro-text' });
+      const dance = $('select', { id: 'tpl-dance' }, $('option', { value: '' }, "Yo'q"), (cat.dances ?? []).map(s => $('option', { value: s.id, selected: d.dance?.style === s.id }, s.name)));
       const music = $('select', { id: 'tpl-music' }, $('option', { value: '' }, "Yo'q"), cat.music.map(s => $('option', { value: s.id, selected: d.music === s.id }, s.name)));
       const title = $('input', { value: d.texts[0]?.text ?? '', id: 'tpl-title' });
       const err = $('p', { class: 'err', role: 'alert' });
@@ -159,6 +160,7 @@ const pages = {
           texts: title.value.trim() ? [{ text: title.value.trim(), at: 0.3, dur: 3, y: 0.82, size: 6, anim: 'pop' }] : [],
           intro: intro.value ? { scene: intro.value, ...(introText.value.trim() ? { text: introText.value.trim() } : {}) } : undefined,
           music: music.value || undefined,
+          dance: dance.value ? { style: dance.value, step: 2, flash: true } : undefined,
         };
         try {
           if (existing) await api(`/api/admin/templates/${existing.id}`, { method: 'PUT', body });
@@ -167,7 +169,7 @@ const pages = {
         } catch (x) { err.textContent = x.message; }
       } },
         $('h3', {}, existing ? 'Shablonni tahrirlash' : 'Yangi shablon'),
-        $('div', { class: 'form-grid' }, $('label', {}, 'Nomi', name), $('label', {}, 'Toifa', catSel), $('label', {}, "O'lcham", aspect), $('label', {}, 'Rasm yoki vidyo soni', slots), $('label', {}, 'Har kadr, soniya. Masalan: 2 yoki 1, 1, 2', rhythm), $('label', {}, 'Sarlavha', title), $('label', {}, '3D kirish sahnasi', intro), $('label', {}, '3D sahna matni', introText), $('label', {}, 'Musiqa', music)),
+        $('div', { class: 'form-grid' }, $('label', {}, 'Nomi', name), $('label', {}, 'Toifa', catSel), $('label', {}, "O'lcham", aspect), $('label', {}, 'Rasm yoki vidyo soni', slots), $('label', {}, 'Har kadr, soniya. Masalan: 2 yoki 1, 1, 2', rhythm), $('label', {}, 'Sarlavha', title), $('label', {}, '3D kirish sahnasi', intro), $('label', {}, '3D sahna matni', introText), $('label', {}, 'Musiqa', music), $('label', {}, "Musiqaga o'ynash", dance)),
         $('label', {}, 'Effektlar. Kadrlar ularni navbat bilan oladi', fxP), $('label', {}, "O'tishlar", trP), $('label', {}, 'Kamera harakati', moP), err,
         $('div', { class: 'row' }, $('button', { class: 'primary', type: 'submit', id: 'tpl-save' }, 'Saqlash'), $('button', { type: 'button', class: 'ghost', onclick: () => formBox.replaceChildren() }, 'Bekor qilish')));
       formBox.replaceChildren(form);
@@ -261,7 +263,7 @@ function showApp() {
     await pages[name](main);
   });
   Object.keys(pages).forEach(n => nav.append($('button', { onclick: () => go(n) }, n)));
-  root.replaceChildren($('div', { class: 'layout' }, $('aside', {}, $('div', { class: 'brand' }, $('span', {}, "Mo'jal Video")), nav, $('div', { style: 'padding:0 8px' }, $('button', { class: 'ghost', onclick: () => { token = ''; sessionStorage.removeItem('admin'); showLogin(); } }, 'Chiqish'))), main));
+  root.replaceChildren($('div', { class: 'layout' }, $('aside', {}, $('div', { class: 'brand' }, $('span', {}, "Vodiy Vidyo Edit")), nav, $('div', { style: 'padding:0 8px' }, $('button', { class: 'ghost', onclick: () => { token = ''; sessionStorage.removeItem('admin'); showLogin(); } }, 'Chiqish'))), main));
   go('Bosh sahifa');
 }
 token ? showApp() : showLogin();

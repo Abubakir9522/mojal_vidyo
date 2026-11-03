@@ -33,7 +33,7 @@ void main(){o=tr(uv);o.a=1.;}`;
 export const SRC_FRAG = `${HEAD}
 uniform sampler2D tex;
 uniform float outAspect,srcAspect,scale,rotation,tiltX,tiltY,opacity,cover;
-uniform vec2 offset,flip;uniform int srcRot;uniform vec3 bg;uniform float bgOn;
+uniform vec2 offset,flip;uniform int srcRot;uniform vec3 bg;uniform float bgOn;uniform vec4 crop;
 void main(){
   vec2 p=uv-.5;p.x*=outAspect;
   p-=offset*vec2(outAspect,1.);
@@ -45,6 +45,7 @@ void main(){
   p*=flip;
   vec2 m=abs(p);
   float edge=smoothstep(.5,.4985,m.x)*smoothstep(.5,.4985,m.y);
+  p=(p+.5)*vec2(1.-crop.x-crop.z,1.-crop.y-crop.w)+vec2(crop.x,crop.w)-.5;
   vec2 q;
   if(srcRot==90)q=vec2(-p.y,p.x);else if(srcRot==180)q=-p;else if(srcRot==270)q=vec2(p.y,-p.x);else q=p;
   vec2 st=vec2(q.x+.5,.5-q.y);
@@ -80,3 +81,30 @@ void main(){
   if(mode==1)c=1.-(1.-b)*(1.-s.rgb);else if(mode==2)c=b*s.rgb;else if(mode==3)c=min(b+s.rgb,vec3(1.));else c=s.rgb;
   o=vec4(mix(b,c,s.a),1.);
 }`;
+
+/** Cuts a clip to a shape. Opaque main-track clips show the project background outside it. */
+export const MASK_FRAG = `${HEAD}
+uniform sampler2D tex;uniform float size,feather,outAspect,bgOn;uniform int shape;uniform vec3 bg;
+float sdHeart(vec2 p){p.x=abs(p.x);p.y+=.55;if(p.y+p.x>1.)return sqrt(dot(p-vec2(.25,.75),p-vec2(.25,.75)))-.3535;return sqrt(min(dot(p-vec2(0.,1.),p-vec2(0.,1.)),dot(p-.5*max(p.x+p.y,0.),p-.5*max(p.x+p.y,0.))))*sign(p.x-p.y);}
+float sdStar(vec2 p){float a=atan(p.x,p.y);float k=6.2832/5.;float d=abs(mod(a,k)-k/2.)/(k/2.);return length(p)-mix(.22,.5,d);}
+void main(){
+  vec2 p=(uv-.5)*vec2(outAspect,1.);
+  float s=max(.02,size);
+  p/=s*min(1.,outAspect);
+  float d;
+  if(shape==0)d=length(p)-.5;
+  else if(shape==1){vec2 q=abs(p)-.38;d=length(max(q,0.))+min(max(q.x,q.y),0.)-.12;}
+  else if(shape==2)d=sdHeart(p*1.5)/1.5;
+  else if(shape==3)d=sdStar(p*1.0);
+  else if(shape==4)d=(abs(p.x)+abs(p.y)-.5)*.7071;
+  else if(shape==5){vec2 q=abs(p);d=max(q.x*.866+q.y*.5,q.y)-.45;}
+  else if(shape==6)d=abs(p.y)-.22;
+  else d=abs(p.x)-.22;
+  float m=1.-smoothstep(-feather*.5-.002,feather*.5+.002,d);
+  vec4 c=texture(tex,uv);
+  if(bgOn>.5)o=vec4(mix(bg,c.rgb,m*c.a),1.);else o=vec4(c.rgb,c.a*m);
+}`;
+
+export const BLUR_FRAG = `${HEAD}
+uniform sampler2D tex;uniform vec2 dir;
+void main(){vec4 c=vec4(0.);float w=0.;for(int i=-8;i<=8;i++){float f=float(i);float g=exp(-f*f/32.);c+=texture(tex,uv+dir*f)*g;w+=g;}o=c/w;}`;
