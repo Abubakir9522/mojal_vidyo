@@ -1,8 +1,9 @@
-import { ALL_FORMATS, AudioBufferSink, AudioBufferSource, BlobSource, BufferTarget, CanvasSink, CanvasSource, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio, getFirstEncodableVideoCodec } from 'mediabunny';
+import { ALL_FORMATS, AudioBufferSink, AudioBufferSource, BlobSource, BufferTarget, CanvasSink, CanvasSource, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio } from 'mediabunny';
 import type { AudioClip, Clip, MediaAsset, Project, TextClip } from '../engine/types';
 import { newText } from '../engine/types';
 import { clipDuration, layoutMain, projectDuration } from '../engine/timeline';
 import { getBlob, saveRawBlob } from '../store/media';
+import { chooseVideoCodec } from '../engine/codec';
 
 export type Progress = (p: number, msg: string) => void;
 
@@ -38,11 +39,11 @@ export async function reverseVideo(asset: MediaAsset, from: number, to: number, 
     const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
     const bitrate = Math.round(w * h * fps * 0.2);
-    const codec = await getFirstEncodableVideoCodec(['avc', 'hevc', 'vp9', 'av1'], { width: w, height: h, bitrate });
-    if (!codec) throw new Error("Bu o'lchamda vidyo kodlab bo'lmadi");
+    const chosen = await chooseVideoCodec(w, h, bitrate, fps);
+    if (!chosen) throw new Error("Bu o'lchamda vidyo kodlab bo'lmadi");
     const target = new BufferTarget();
     const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target });
-    const vs = new CanvasSource(canvas, { codec, bitrate, keyFrameInterval: 1 });
+    const vs = new CanvasSource(canvas, { codec: chosen.codec, fullCodecString: chosen.fullCodecString, bitrate, keyFrameInterval: 1 });
     output.addVideoTrack(vs, { frameRate: fps });
 
     const aTrack = await input.getPrimaryAudioTrack();

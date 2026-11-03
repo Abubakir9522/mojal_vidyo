@@ -1,6 +1,7 @@
-import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, Input, Mp4OutputFormat, Output, StreamTarget, VideoSampleSink, canEncodeAudio, getFirstEncodableVideoCodec } from 'mediabunny';
+import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, Input, Mp4OutputFormat, Output, StreamTarget, VideoSampleSink, canEncodeAudio } from 'mediabunny';
 import type { VideoSample } from 'mediabunny';
 import { Compositor, Frame } from './compositor';
+import { chooseVideoCodec } from './codec';
 import { AudioMixer, SAMPLE_RATE, audioSegments } from './mixer';
 import { Scene3DRenderer } from './scene3d';
 import { ASPECTS, Clip, MediaAsset, Project } from './types';
@@ -88,8 +89,9 @@ export async function exportProject(project: Project, opts: ExportOptions, onPro
   const scenes = new Scene3DRenderer(getImage);
 
   const bitrate = Math.round(w * h * fps * BITS[opts.quality]);
-  const codec = await getFirstEncodableVideoCodec(['avc', 'hevc', 'vp9', 'av1'], { width: w, height: h, bitrate });
-  if (!codec) throw new Error(`${w}x${h} o'lchamda video kodlab bo'lmadi. Pastroq sifatni tanlang.`);
+  const chosen = await chooseVideoCodec(w, h, bitrate, fps);
+  if (!chosen) throw new Error(`${w}x${h} o'lchamda video kodlab bo'lmadi. Pastroq sifatni tanlang.`);
+  const codec = chosen.codec;
 
   // Prefer writing straight to device storage, so long videos do not have to fit in memory.
   let fileHandle: FileSystemFileHandle | null = null;
@@ -104,7 +106,7 @@ export async function exportProject(project: Project, opts: ExportOptions, onPro
 
   const target = writable ? new StreamTarget(writable as unknown as WritableStream, { chunked: true, chunkSize: 4 * 1024 * 1024 }) : new BufferTarget();
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: writable ? false : 'in-memory' }), target });
-  const videoSource = new CanvasSource(canvas, { codec, bitrate, keyFrameInterval: 2, latencyMode: 'quality', hardwareAcceleration: 'no-preference' });
+  const videoSource = new CanvasSource(canvas, { codec, fullCodecString: chosen.fullCodecString, bitrate, keyFrameInterval: 2, latencyMode: 'quality', hardwareAcceleration: 'no-preference' });
   output.addVideoTrack(videoSource, { frameRate: fps });
 
   const assets = new Map<string, MediaAsset>();

@@ -65,6 +65,7 @@ try {
   const con = [];
   page.on('pageerror', e => { errors.push(e.message); con.push('pageerror: ' + e.message); });
   page.on('console', m => con.push(`${m.type()}: ${m.text()}`.slice(0, 400)));
+  page.on('response', r => { if (r.status() >= 400) con.push(`status ${r.status()}: ${r.url().slice(0, 160)}`); });
   page.on('requestfailed', r => con.push(`failed: ${r.url().slice(0, 160)} ${r.failure()?.errorText}`));
   const diag = async () => {
     try {
@@ -150,7 +151,17 @@ try {
       window.__smoke = r;
       return { size: r.size, codec: r.codec, secs: +r.seconds.toFixed(1), w: r.width, h: r.height };
     }, { code: buildProject, ids }));
-    if (ex) check('MP4 export in the WebView', ex.size > 5000, JSON.stringify(ex));
+    if (ex) check('MP4 export in the WebView', ex.size > 5000 && ex.codec === 'avc', JSON.stringify(ex));
+
+    const big = await step('720p export', 300000, () => page.evaluate(async () => {
+      const T = window.__t, ty = T.ty;
+      const p = ty.newProject('9:16', 'katta');
+      p.main = [ty.newClip({ kind: 'color', color: '#d6246e', duration: 1, effects: [{ id: 'l_bokeh', amount: 1 }] })];
+      p.texts = [ty.newText({ text: '720p', start: 0, duration: 1 })];
+      const r = await T.exportProject(p, { height: 720, fps: 30, quality: 'high' }, () => {});
+      return { size: r.size, codec: r.codec, w: r.width, h: r.height, secs: +r.seconds.toFixed(1) };
+    }));
+    if (big) check('720p export', big.size > 1000 && big.w === 720 && big.codec === 'avc', JSON.stringify(big));
 
     if (ex) {
       const saved = await step('save to gallery', 120000, () => page.evaluate(async () => {
