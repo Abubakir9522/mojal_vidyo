@@ -26,6 +26,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # The default list asks for the old 'tools' package, which no longer exists.
+          packages: platform-tools
       - name: Build web files
         working-directory: app
         run: |
@@ -67,6 +70,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # The default list asks for the old 'tools' package, which no longer exists.
+          packages: platform-tools
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
