@@ -256,21 +256,24 @@ try {
       await shot(`5-chooser-${i}`);
       const xml = await sh('adb exec-out uiautomator dump /dev/tty', 30000).catch(() => '');
       if (i === 0) fs.writeFileSync(`${OUT}/chooser.xml`, xml);
-      // Android 13 and newer open the system photo picker, where a video is labelled by its length.
-      const m = /text="(?:sinov_klip[^"]*|00:06)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
+            const m = /text="sinov_klip[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
       if (m) {
         await sh(`adb shell input tap ${(+m[1] + +m[3]) >> 1} ${(+m[2] + +m[4]) >> 1}`, 15000);
         tapped = true;
         await new Promise(r => setTimeout(r, 2500));
         await shot('5-selected');
         const after = await sh('adb exec-out uiautomator dump /dev/tty', 30000).catch(() => '');
-        const add = /text="(?:Add|Select|Done|OK)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(after);
+        const add = /text="(?:Add|Select|SELECT|Done|OK)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(after);
         if (add) await sh(`adb shell input tap ${(+add[1] + +add[3]) >> 1} ${(+add[2] + +add[4]) >> 1}`, 15000);
+      } else if (i >= 1) {
+        // The Files screen can open on another folder: its side list leads to Downloads.
+        const d = /text="Downloads"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml) ?? /content-desc="Show roots"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
+        if (d) await sh(`adb shell input tap ${(+d[1] + +d[3]) >> 1} ${(+d[2] + +d[4]) >> 1}`, 15000);
       }
     }
     check('Android file chooser shows the video', tapped);
     if (!tapped) { await sh('adb shell input keyevent 4', 10000).catch(() => {}); return; }
-    await page.waitForSelector('[data-testid=clip-main]', { timeout: 60000 });
+    await page.waitForSelector('[data-testid=clip-main]', { timeout: 60000 }).catch(async e => { await shot('6-failed'); await diag(); throw e; });
     await new Promise(r => setTimeout(r, 3000));
     await shot('6-picked');
     const a = await page.evaluate(() => ({ clips: window.__player.project.main.length, kind: window.__player.project.main[0]?.kind, out: window.__player.project.main[0]?.out }));

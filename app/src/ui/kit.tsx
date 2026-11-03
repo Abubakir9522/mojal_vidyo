@@ -76,6 +76,11 @@ export function UiProvider({ children }: { children: ComponentChildren }) {
     done: () => setBusy(null),
     toast: (msg, bad) => { setToast({ msg, bad }); clearTimeout(timer.current); timer.current = window.setTimeout(() => setToast(null), bad ? 6000 : 2600); },
   });
+  useEffect(() => {
+    const on = (e: Event) => ui.current.toast((e as CustomEvent<string>).detail);
+    window.addEventListener('vodiy-hint', on);
+    return () => window.removeEventListener('vodiy-hint', on);
+  }, []);
   return (
     <UiCtx.Provider value={ui.current}>
       {children}
@@ -96,7 +101,11 @@ export async function importAll(files: File[], ui: Ui): Promise<MediaAsset[]> {
   const errors: string[] = [];
   for (let i = 0; i < files.length; i++) {
     ui.busy(`Fayl qo'shilmoqda: ${files[i].name}`, i / files.length);
-    try { out.push(await importFile(files[i])); } catch (e) { errors.push((e as Error).message); }
+    try { out.push(await importFile(files[i])); } catch (e) {
+      // Browser read errors are in English and name no file, so they get a plain message here.
+      const m = (e as Error).message ?? '';
+      errors.push(/[a-z]+ [a-z]+ (could|not|was)|NotReadable|NotFound/i.test(`${(e as Error).name} ${m}`) && !/bo'lmadi|topilmadi|qo'llanmaydi/.test(m) ? `${files[i].name} faylini ochib bo'lmadi. Boshqa fayl tanlang.` : m);
+    }
   }
   ui.done();
   if (errors.length) ui.toast(errors[0], true);

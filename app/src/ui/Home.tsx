@@ -42,7 +42,10 @@ export function Home({ nav, open }: { nav: Nav; open: (p: Project) => void }) {
   const start = async (aspect: AspectId) => {
     setAsking(false);
     const files = await pickFiles('video/*,image/*');
+    // Backing out of the file screen, or every file failing, stays here instead of opening an empty project.
+    if (!files.length) return;
     const assets = await importAll(files, ui);
+    if (!assets.length) return;
     const p = newProject(aspect);
     for (const a of assets) {
       p.main.push(a.kind === 'video'

@@ -51,12 +51,18 @@ export async function shareVideo(saved: Saved | null, blob: Blob, name: string) 
   else throw new Error('Bu brauzer ulashishni qo\'llamaydi. Faylni yuklab oling.');
 }
 
+let multiHintShown = false;
+
 /** Opens the system file chooser and resolves with the chosen files. Empty if the user backed out. */
 export function pickFiles(accept: string, multiple = true): Promise<File[]> {
   return new Promise(res => {
     const i = document.createElement('input');
     i.type = 'file'; i.accept = accept; i.multiple = multiple; i.style.display = 'none';
     i.dataset.picker = accept;
+    if (multiple && isNative() && !multiHintShown) {
+      multiHintShown = true;
+      window.dispatchEvent(new CustomEvent('vodiy-hint', { detail: "Bir nechta fayl tanlash uchun birinchi faylni bosib turing" }));
+    }
     document.body.appendChild(i);
     const finish = (f: File[]) => { i.remove(); res(f); };
     i.addEventListener('change', () => finish(Array.from(i.files ?? [])));
