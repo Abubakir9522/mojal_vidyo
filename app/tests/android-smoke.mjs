@@ -59,8 +59,20 @@ try {
   console.log('device found');
   const webview = await limit(device.webView({ pkg: PKG }, { timeout: 150000 }), 170000, 'webview');
   console.log('webview found');
-  const page = await limit(webview.page(), 120000, 'page');
-  console.log('page attached', page.url());
+  // A restarted activity leaves a dead page behind with no size, so only a page with a real size counts.
+  let page = await limit(webview.page(), 120000, 'page');
+  for (let i = 0; i < 20; i++) {
+    let found = false;
+    for (const wv of device.webViews()) {
+      if (wv.pkg() !== PKG) continue;
+      const p = await limit(wv.page(), 30000, 'page').catch(() => null);
+      const w = p ? await limit(p.evaluate(() => innerWidth), 10000, 'width').catch(() => 0) : 0;
+      if (w > 0) { page = p; found = true; break; }
+    }
+    if (found) break;
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  console.log('page attached', page.url(), 'webviews', device.webViews().length);
   const errors = [];
   const con = [];
   page.on('pageerror', e => { errors.push(e.message); con.push('pageerror: ' + e.message); });
