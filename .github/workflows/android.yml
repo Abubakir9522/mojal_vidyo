@@ -92,15 +92,22 @@ jobs:
           arch: x86_64
           ram-size: 4096M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu guest -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: app
           script: node tests/android-smoke.mjs
-      - uses: actions/upload-artifact@v4
+      - name: Keep test results
+        if: always()
+        run: |
+          ls -la /tmp/android-runner 2>/dev/null || true
+          (cd app/tests && zip -qr "$GITHUB_WORKSPACE/emulator-results.zip" android-out) || true
+      - uses: softprops/action-gh-release@v2
         if: always()
         with:
-          name: emulator-results
-          path: app/tests/android-out
-          retention-days: 14
+          tag_name: test-results
+          name: Sinov natijalari
+          prerelease: true
+          make_latest: false
+          files: emulator-results.zip
 
   # The download link only moves once the build and the emulator test have both passed.
   publish:

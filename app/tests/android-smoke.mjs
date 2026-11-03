@@ -36,6 +36,7 @@ const hardStop = setTimeout(() => { check('run finished in time', false); void f
 async function finish() {
   clearTimeout(hardStop);
   save();
+  try { console.log('emulator state:', (await sh('adb get-state', 10000)).trim()); } catch (e) { check('emulator stayed alive', false, String(e).slice(0, 200)); }
   try { fs.writeFileSync(`${OUT}/logcat.txt`, await sh('adb logcat -d', 45000)); } catch (e) { console.log('logcat', String(e).slice(0, 200)); }
   try {
     const fatal = (await sh('adb logcat -d -b crash', 20000)).trim();
