@@ -229,6 +229,46 @@ try {
       check('preview shows a picture', painted > 8, String(painted));
     });
   }
+  // The real phone flow: Android's own file chooser, then a finger drag on the timeline.
+  await step('file chooser and touch', 240000, async () => {
+    await sh('adb push tests/fixtures/clip1.mp4 /sdcard/Download/sinov_klip.mp4', 60000);
+    await sh('adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/sinov_klip.mp4', 20000);
+    await new Promise(r => setTimeout(r, 2000));
+    await page.click('[data-testid=ed-back]');
+    await page.waitForSelector('.home', { timeout: 30000 });
+    await page.click('[data-testid=new-project]');
+    await page.click('[data-testid=aspect-9x16]');
+    let tapped = false;
+    for (let i = 0; i < 12 && !tapped; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      await shot(`5-chooser-${i}`);
+      const xml = await sh('adb exec-out uiautomator dump /dev/tty', 30000).catch(() => '');
+      if (i === 0) fs.writeFileSync(`${OUT}/chooser.xml`, xml);
+      const m = /text="sinov_klip[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
+      if (m) {
+        await sh(`adb shell input tap ${(+m[1] + +m[3]) >> 1} ${(+m[2] + +m[4]) >> 1}`, 15000);
+        tapped = true;
+      } else if (i === 3) {
+        // The chooser may open on Recent: its root list leads to Downloads.
+        const d = /(?:text|content-desc)="(?:Downloads|Show roots)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml);
+        if (d) await sh(`adb shell input tap ${(+d[1] + +d[3]) >> 1} ${(+d[2] + +d[4]) >> 1}`, 15000);
+      }
+    }
+    check('Android file chooser shows the video', tapped);
+    if (!tapped) { await sh('adb shell input keyevent 4', 10000).catch(() => {}); return; }
+    await page.waitForSelector('[data-testid=clip-main]', { timeout: 60000 });
+    await new Promise(r => setTimeout(r, 3000));
+    await shot('6-picked');
+    const a = await page.evaluate(() => ({ clips: window.__player.project.main.length, kind: window.__player.project.main[0]?.kind, out: window.__player.project.main[0]?.out }));
+    check('picked video opens in the editor', a.clips === 1 && a.kind === 'video' && a.out > 5, JSON.stringify(a));
+    const box = await page.evaluate(() => { const r = document.querySelector('[data-testid=tl-scroll]').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, d: devicePixelRatio }; });
+    const y = Math.round((box.y + box.h * 0.35) * box.d), x1 = Math.round((box.x + box.w * 0.8) * box.d), x2 = Math.round((box.x + box.w * 0.25) * box.d);
+    await sh(`adb shell input swipe ${x1} ${y} ${x2} ${y} 500`, 15000);
+    await new Promise(r => setTimeout(r, 1500));
+    const t = await page.evaluate(() => window.__player.t);
+    check('finger drag moves through the timeline', t > 0.3, String(t));
+    await shot('7-dragged');
+  });
   check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   await shot('4-end');
   await diag();
